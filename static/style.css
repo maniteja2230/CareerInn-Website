@@ -1,0 +1,342 @@
+/* ====== GLOBAL ====== */
+body {
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Inter", sans-serif;
+    font-size: 16px;
+    color: #f9fafb;
+    background: #020617;
+    position: relative;
+    min-height: 100vh;
+}
+
+/* big gradient mesh background */
+body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    background:
+        radial-gradient(circle at 0% 0%, #312e81 0, transparent 55%),
+        radial-gradient(circle at 100% 0%, #0ea5e9 0, transparent 55%),
+        radial-gradient(circle at 0% 100%, #22c55e 0, transparent 55%),
+        radial-gradient(circle at 100% 100%, #7c3aed 0, transparent 60%),
+        radial-gradient(circle at 50% 40%, #020617 0, #020617 65%, #020617 100%);
+    opacity: 0.9;
+    filter: blur(4px);
+}
+
+/* make all main page titles bigger */
+main h2 {
+    font-size: clamp(2.1rem, 3.3vw, 2.8rem);
+    font-weight: 800;
+}
+
+/* hero title even bigger */
+.hero-shell h1 {
+    font-size: clamp(2.5rem, 3.8vw, 3.3rem);
+    line-height: 1.15;
+}
+
+/* smaller helper text */
+.hero-footnote {
+    font-size: 12px;
+    color: #9ca3af;
+    margin-top: 8px;
+}
+
+/* ====== HERO GLOW ====== */
+.hero-shell {
+    position: relative;
+    isolation: isolate;
+    margin-bottom: 2.5rem;
+}
+.hero-shell::before {
+    content: "";
+    position: absolute;
+    inset: -80px;
+    background:
+        radial-gradient(circle at 0% 0%, rgba(129,140,248,.35), transparent 55%),
+        radial-gradient(circle at 100% 0%, rgba(56,189,248,.26), transparent 55%),
+        radial-gradient(circle at 50% 100%, rgba(52,211,153,.18), transparent 60%);
+    opacity: 0.9;
+    filter: blur(18px);
+    z-index: -1;
+}
+
+/* ====== HERO CARD ====== */
+.hero-card {
+    backdrop-filter: blur(26px);
+    background: radial-gradient(circle at top left, rgba(129,140,248,0.3), #020617);
+    border-radius: 24px;
+    border: 1px solid rgba(148,163,184,0.45);
+    padding: 24px 22px;
+    box-shadow:
+        0 24px 50px rgba(15,23,42,0.95),
+        0 0 0 1px rgba(15,23,42,0.9);
+    font-size: 14px;
+}
+
+/* ====== PILLS & TEXT ====== */
+.pill-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border-radius: 999px;
+    border: 1px solid rgba(129,140,248,0.9);
+    background: rgba(15,23,42,0.9);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: .18em;
+    color: #c7d2fe;
+}
+.dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 999px;
+    background: #22c55e;
+    box-shadow: 0 0 10px rgba(22,163,74,0.9);
+}
+
+.gradient-text {
+    background: linear-gradient(120deg, #a5b4fc, #22d3ee);
+    -webkit-background-clip: text;
+    color: transparent;
+}
+
+/* ====== CTA BUTTONS ====== */
+.primary-cta {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 12px 24px;
+    border-radius: 999px;
+    font-size: 15px;
+    font-weight: 700;
+    background: linear-gradient(135deg, #6366f1, #22c55e);
+    color: white;
+    box-shadow: 0 16px 36px rgba(79,70,229,0.7);
+    transition: transform .2s ease, filter .2s ease, box-shadow .2s ease;
+}
+.primary-cta:hover {
+    transform: translateY(-2px) scale(1.04);
+    filter: brightness(1.08);
+    box-shadow: 0 20px 42px rgba(79,70,229,0.8);
+}
+
+.ghost-cta {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 11px 22px;
+    border-radius: 999px;
+    font-size: 14px;
+    border: 1px solid #4b5563;
+    color: #e5e7eb;
+    background: rgba(15,23,42,0.7);
+    transition: background .2s ease, border-color .2s ease, color .2s ease, transform .2s ease;
+}
+.ghost-cta:hover {
+    background: rgba(79,70,229,0.9);
+    border-color: #818cf8;
+    color: white;
+    transform: translateY(-1px);
+}
+
+/* ====== FEATURE CARDS ====== */
+.feature-card {
+    background: radial-gradient(circle at top left, rgba(148,163,253,0.2), rgba(15,23,42,0.98));
+    border: 1px solid rgba(148,163,184,0.4);
+    border-radius: 20px;
+    padding: 18px 18px 20px 18px;
+    font-size: 16px;
+    font-weight: 600;
+    color: #f9fafb;
+    transition: transform .25s ease, box-shadow .25s ease, border-color .25s ease, background .25s ease;
+}
+.feature-card .sub {
+    margin-top: 6px;
+    font-size: 13px;
+    font-weight: 400;
+    color: #cbd5f5;
+}
+.feature-card:hover {
+    transform: translateY(-6px);
+    border-color: #6366f1;
+    box-shadow:
+        0 22px 40px rgba(15,23,42,0.95),
+        0 0 0 1px rgba(129,140,248,0.7);
+    background: radial-gradient(circle at top left, rgba(129,140,248,0.35), rgba(15,23,42,0.98));
+}
+
+/* ====== AUTH CARDS ====== */
+.auth-card {
+    background: radial-gradient(circle at top left, rgba(129,140,248,0.24), #020617);
+    padding: 32px 28px;
+    width: 380px;
+    max-width: 100%;
+    border-radius: 22px;
+    border: 1px solid rgba(30,64,175,0.6);
+    box-shadow:
+        0 22px 42px rgba(15,23,42,0.98),
+        0 0 0 1px rgba(148,163,184,0.28);
+    margin: 24px auto;
+    font-size: 15px;
+}
+
+.input-box {
+    width: 100%;
+    background: rgba(15,23,42,0.98);
+    border: 1px solid rgba(51,65,85,0.95);
+    padding: 11px 12px;
+    margin-bottom: 12px;
+    border-radius: 10px;
+    font-size: 14px;
+    color: #e5e7eb;
+}
+.input-box:focus {
+    outline: none;
+    border-color: #6366f1;
+    box-shadow: 0 0 0 1px rgba(99,102,241,0.8);
+}
+
+.submit-btn {
+    width: 100%;
+    background: linear-gradient(135deg, #6366f1, #4f46e5);
+    padding: 11px;
+    border-radius: 999px;
+    font-weight: 600;
+    font-size: 14px;
+    margin-top: 6px;
+    box-shadow: 0 16px 34px rgba(79,70,229,0.7);
+}
+.submit-btn:hover {
+    background: linear-gradient(135deg, #818cf8, #4f46e5);
+}
+
+/* ====== DASHBOARD ====== */
+.dash-box {
+    background: radial-gradient(circle at top left, rgba(56,189,248,0.28), #020617);
+    border: 1px solid rgba(148,163,184,0.4);
+    padding: 18px 16px;
+    border-radius: 20px;
+    font-size: 15px;
+    font-weight: 600;
+}
+.dash-box span {
+    display: block;
+    margin-top: 6px;
+    font-size: 22px;
+    color: #93c5fd;
+    font-weight: 800;
+}
+
+/* ====== TABLES (Courses) ====== */
+.table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 12px;
+    font-size: 14px;
+}
+.table th {
+    background: rgba(2,6,23,0.95);
+    padding: 11px 14px;
+    text-align: left;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: .12em;
+    color: #9ca3af;
+    border-bottom: 1px solid #1f2937;
+}
+.table td {
+    padding: 11px 14px;
+    border-bottom: 1px solid #111827;
+    color: #e5e7eb;
+}
+
+/* search bar shared */
+.search-bar {
+    flex: 1;
+    min-width: 260px;
+    padding: 11px 14px;
+    border-radius: 999px;
+    background: #020617;
+    border: 1px solid #1f2937;
+    color: #e5e7eb;
+    font-size: 14px;
+}
+.search-bar:focus {
+    outline: none;
+    border-color: #6366f1;
+}
+
+/* ====== COURSES PAGE CARD ====== */
+.courses-shell {
+    margin-top: 32px;
+    margin-bottom: 40px;
+}
+.courses-title {
+    font-size: clamp(2.2rem, 3.4vw, 2.9rem);
+    font-weight: 800;
+    margin-bottom: 18px;
+}
+.courses-search-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    align-items: center;
+    margin-bottom: 18px;
+}
+.search-btn {
+    padding: 10px 20px;
+    border-radius: 999px;
+    background: #4f46e5;
+    font-size: 14px;
+    font-weight: 600;
+    color: white;
+    border: none;
+    box-shadow: 0 12px 28px rgba(79,70,229,0.6);
+    cursor: pointer;
+}
+.search-btn:hover {
+    background: #6366f1;
+}
+.courses-card {
+    margin-top: 8px;
+    background: radial-gradient(circle at top left, rgba(79,70,229,0.26), #020617);
+    border-radius: 22px;
+    border: 1px solid rgba(148,163,184,0.4);
+    padding: 20px 20px 12px 20px;
+    box-shadow:
+        0 24px 46px rgba(15,23,42,0.96),
+        0 0 0 1px rgba(15,23,42,0.95);
+}
+
+/* ====== MENTOR & JOB CARDS ====== */
+.mentor-card,
+.job-card {
+    background: radial-gradient(circle at top left, rgba(129,140,248,0.22), #020617);
+    border: 1px solid rgba(30,64,175,0.6);
+    padding: 18px 16px;
+    border-radius: 20px;
+    transition: transform .25s ease, box-shadow .25s ease, border-color .25s ease;
+    font-size: 14px;
+}
+.mentor-card:hover,
+.job-card:hover {
+    transform: translateY(-5px);
+    border-color: #6366f1;
+    box-shadow:
+        0 18px 38px rgba(15,23,42,0.95),
+        0 0 0 1px rgba(129,140,248,0.75);
+}
+
+/* ====== SUPPORT BOX ====== */
+.support-box {
+    background: radial-gradient(circle at top left, rgba(129,140,248,0.2), #020617);
+    border: 1px solid rgba(148,163,184,0.55);
+    padding: 20px;
+    border-radius: 20px;
+    width: 360px;
+    max-width: 100%;
+    font-size: 14px;
+}
