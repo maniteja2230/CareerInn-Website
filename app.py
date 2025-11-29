@@ -1,167 +1,221 @@
-from flask import Flask, request, redirect, session, render_template_string
-import sqlite3
+import os
 import html
 
+from flask import (
+    Flask,
+    request,
+    redirect,
+    session,
+    render_template_string,
+)
+
+from openai import OpenAI
+
+from sqlalchemy import (
+    create_engine,
+    Column,
+    Integer,
+    String,
+    Float,
+    Text,
+)
+from sqlalchemy.orm import declarative_base, sessionmaker, scoped_session
+
+# -------------------- FLASK SETUP --------------------
 app = Flask(__name__)
-app.secret_key = "careerinn_secure_key"
-DB = "database.db"
+app.secret_key = os.getenv("FLASK_SECRET_KEY", "careerinn_secure_key")
 
-# ======================= DB SETUP =======================
+# -------------------- DB SETUP (POSTGRES / SQLITE) --------------------
+DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///careerinn.db")
+
+engine = create_engine(
+    DATABASE_URL,
+    pool_pre_ping=True,
+)
+
+SessionLocal = scoped_session(
+    sessionmaker(bind=engine, autoflush=False, autocommit=False)
+)
+
+Base = declarative_base()
+
+
+class User(Base):
+    __tablename__ = "users"
+
+    id = Column(Integer, primary_key=True)
+    name = Column(String(255), nullable=False)
+    email = Column(String(255), unique=True, nullable=False)
+    password = Column(String(255), nullable=False)
+
+
+class College(Base):
+    __tablename__ = "colleges"
+
+    id = Column(Integer, primary_key=True)
+    name = Column(String(255), nullable=False)
+    location = Column(String(255), nullable=False)
+    fees = Column(Integer, nullable=False)
+    course = Column(String(255), nullable=False)
+    rating = Column(Float, nullable=False)
+
+
+class Mentor(Base):
+    __tablename__ = "mentors"
+
+    id = Column(Integer, primary_key=True)
+    name = Column(String(255), nullable=False)
+    experience = Column(Text, nullable=False)
+    speciality = Column(String(255), nullable=False)
+
+
+class Job(Base):
+    __tablename__ = "jobs"
+
+    id = Column(Integer, primary_key=True)
+    title = Column(Text, nullable=False)
+    company = Column(String(255), nullable=False)
+    location = Column(String(255), nullable=False)
+    salary = Column(String(255), nullable=False)
+
+
+def get_db():
+    return SessionLocal()
+
+
 def init_db():
-    conn = sqlite3.connect(DB)
-    c = conn.cursor()
+    db = get_db()
+    Base.metadata.create_all(bind=engine)
 
-    c.execute("""
-        CREATE TABLE IF NOT EXISTS users(
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT,
-            email TEXT UNIQUE,
-            password TEXT
-        )
-    """)
-
-    # Rebuild colleges with course + rating columns
-    c.execute("DROP TABLE IF EXISTS colleges")
-    c.execute("""
-        CREATE TABLE IF NOT EXISTS colleges(
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT,
-            location TEXT,
-            fees INT,
-            course TEXT,
-            rating REAL
-        )
-    """)
-
-    c.execute("""
-        CREATE TABLE IF NOT EXISTS mentors(
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT,
-            experience TEXT,
-            speciality TEXT
-        )
-    """)
-
-    c.execute("""
-        CREATE TABLE IF NOT EXISTS jobs(
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            title TEXT,
-            company TEXT,
-            location TEXT,
-            salary TEXT
-        )
-    """)
-
-    # ---------- HYDERABAD HM COLLEGES + COURSES + RATING ----------
-    colleges_seed = [
-        ("IHM Hyderabad (IHMH)", "DD Colony, Hyderabad", 320000,
-         "BSc in Hospitality & Hotel Administration", 4.6),
-
-        ("NITHM Hyderabad", "Gachibowli, Hyderabad", 280000,
-         "BBA in Tourism & Hospitality", 4.3),
-
-        ("IIHM Hyderabad", "Somajiguda, Hyderabad", 350000,
-         "BA in Hospitality Management", 4.5),
-
-        ("Regency College of Culinary Arts & Hotel Management", "Himayatnagar, Hyderabad", 240000,
-         "BHM & Culinary Arts", 4.4),
-
-        ("IHM Shri Shakti", "Kompally, Hyderabad", 260000,
-         "BSc Hotel Management & Catering", 4.2),
-
-        ("Chennais Amirta IHM – Hyderabad", "Khairatabad, Hyderabad", 180000,
-         "Diploma in Hotel Management", 4.0),
-
-        ("Westin College of Hotel Management", "Nizampet, Hyderabad", 190000,
-         "Bachelor of Hotel Management (BHM)", 3.9),
-
-        ("Malla Reddy University – Hotel Management", "Maisammaguda, Hyderabad", 210000,
-         "BSc Hotel Management", 4.1),
-
-        ("SIITAM Hyderabad", "Tarnaka, Hyderabad", 170000,
-         "BHM", 3.8),
-
-        ("Zest College of Hotel Management", "Hyderabad", 90000,
-         "Diploma in Hotel Management", 3.7),
-
-        ("Roots Collegium – Hotel Management", "Somajiguda, Hyderabad", 200000,
-         "BBA in Hotel Management", 4.0),
-
-        ("Aptech Aviation & Hospitality – Hyderabad", "Ameerpet, Hyderabad", 85000,
-         "Diploma in Aviation & Hospitality", 3.6),
-
-        ("St. Mary’s College – Hospitality", "Yousufguda, Hyderabad", 140000,
-         "BVoc Hospitality & Tourism", 3.9),
-
-        ("Aurora’s Degree College – Hotel Management", "Chikkadpally, Hyderabad", 160000,
-         "BHM", 3.8),
-
-        ("Global College of Hotel Management", "Kukatpally, Hyderabad", 95000,
-         "Diploma in Hotel Operations", 3.7)
-    ]
-
-    c.execute("DELETE FROM colleges")
-    c.executemany(
-        "INSERT INTO colleges(name,location,fees,course,rating) VALUES(?,?,?,?,?)",
-        colleges_seed
-    )
-
-    # ----- mentors seed (still demo) -----
-    c.execute("SELECT COUNT(*) FROM mentors")
-    if c.fetchone()[0] == 0:
-        mentors_seed = [
-            ("Mentor ... A", "Experience ...", "Speciality ..."),
-            ("Mentor ... B", "Experience ...", "Speciality ..."),
-            ("Mentor ... C", "Experience ...", "Speciality ...")
+    # seed colleges if empty
+    if db.query(College).count() == 0:
+        colleges_seed = [
+            ("IHM Hyderabad (IHMH)", "DD Colony, Hyderabad", 320000,
+             "BSc in Hospitality & Hotel Administration", 4.6),
+            ("NITHM Hyderabad", "Gachibowli, Hyderabad", 280000,
+             "BBA in Tourism & Hospitality", 4.3),
+            ("IIHM Hyderabad", "Somajiguda, Hyderabad", 350000,
+             "BA in Hospitality Management", 4.5),
+            ("Regency College of Culinary Arts & Hotel Management", "Himayatnagar, Hyderabad", 240000,
+             "BHM & Culinary Arts", 4.4),
+            ("IHM Shri Shakti", "Kompally, Hyderabad", 260000,
+             "BSc Hotel Management & Catering", 4.2),
+            ("Chennais Amirta IHM – Hyderabad", "Khairatabad, Hyderabad", 180000,
+             "Diploma in Hotel Management", 4.0),
+            ("Westin College of Hotel Management", "Nizampet, Hyderabad", 190000,
+             "Bachelor of Hotel Management (BHM)", 3.9),
+            ("Malla Reddy University – Hotel Management", "Maisammaguda, Hyderabad", 210000,
+             "BSc Hotel Management", 4.1),
+            ("SIITAM Hyderabad", "Tarnaka, Hyderabad", 170000,
+             "BHM", 3.8),
+            ("Zest College of Hotel Management", "Hyderabad", 90000,
+             "Diploma in Hotel Management", 3.7),
+            ("Roots Collegium – Hotel Management", "Somajiguda, Hyderabad", 200000,
+             "BBA in Hotel Management", 4.0),
+            ("Aptech Aviation & Hospitality – Hyderabad", "Ameerpet, Hyderabad", 85000,
+             "Diploma in Aviation & Hospitality", 3.6),
+            ("St. Mary’s College – Hospitality", "Yousufguda, Hyderabad", 140000,
+             "BVoc Hospitality & Tourism", 3.9),
+            ("Aurora’s Degree College – Hotel Management", "Chikkadpally, Hyderabad", 160000,
+             "BHM", 3.8),
+            ("Global College of Hotel Management", "Kukatpally, Hyderabad", 95000,
+             "Diploma in Hotel Operations", 3.7),
         ]
-        c.executemany(
-            "INSERT INTO mentors(name,experience,speciality) VALUES(?,?,?)",
-            mentors_seed
-        )
+        for name, loc, fees, course, rating in colleges_seed:
+            db.add(College(
+                name=name,
+                location=loc,
+                fees=fees,
+                course=course,
+                rating=rating
+            ))
 
-    # ----- placements seed in jobs table -----
-    c.execute("SELECT COUNT(*) FROM jobs")
-    if c.fetchone()[0] == 0:
+    # seed mentors if empty (still demo)
+    if db.query(Mentor).count() == 0:
+        mentors_seed = [
+            ("Mentor ... A", "Industry experience ...", "Hotel Ops / Front Office"),
+            ("Mentor ... B", "Industry experience ...", "Culinary / F&B"),
+            ("Mentor ... C", "Industry experience ...", "Abroad & Cruise guidance"),
+        ]
+        for n, exp, spec in mentors_seed:
+            db.add(Mentor(name=n, experience=exp, speciality=spec))
+
+    # seed jobs as placements snapshot
+    if db.query(Job).count() == 0:
         jobs_seed = [
             ("IHM Hyderabad – Management Trainee (Hotel Ops)",
              "Taj / IHCL", "Pan India", "Avg package ~₹4.5–5.5 LPA"),
-
             ("IHM Hyderabad – F&B Associate",
              "Marriott Hotels", "Hyderabad / Bengaluru", "Avg package ~₹3–4 LPA"),
-
             ("NITHM – Guest Relations Executive",
              "ITC Hotels", "Hyderabad", "Avg package ~₹3.5–4.5 LPA"),
-
             ("IIHM Hyderabad – Hospitality Management Trainee",
              "Accor Hotels", "Pan India / Overseas", "Avg package ~₹4–6 LPA (varies)"),
-
             ("Regency College – Commis Chef",
              "5-star Hotels & QSR chains", "Hyderabad", "Avg package ~₹2.5–3.5 LPA"),
-
             ("IHM Shri Shakti – Front Office Associate",
              "Oberoi / Trident", "Metro cities", "Avg package ~₹3.5–4.5 LPA"),
-
             ("Westin College – Hotel Operations Trainee",
              "Hyatt Hotels", "Pan India", "Avg package ~₹3–4 LPA"),
-
             ("Malla Reddy Univ – Hospitality Roles",
              "Resorts & Cruise Lines", "India / Overseas", "Avg package ~₹3–6 LPA (role based)"),
-
             ("Roots Collegium – Hospitality Placement",
-             "Retail & Hospitality Chains", "Hyderabad", "Avg package ~₹2.5–3.5 LPA")
+             "Retail & Hospitality Chains", "Hyderabad", "Avg package ~₹2.5–3.5 LPA"),
         ]
-        c.executemany(
-            "INSERT INTO jobs(title,company,location,salary) VALUES(?,?,?,?)",
-            jobs_seed
-        )
+        for t, c_, loc, sal in jobs_seed:
+            db.add(Job(title=t, company=c_, location=loc, salary=sal))
 
-    conn.commit()
-    conn.close()
+    db.commit()
+    db.close()
 
-# run once on import
+
+@app.teardown_appcontext
+def shutdown_session(exception=None):
+    SessionLocal.remove()
+
+
+# initialize db on startup
 init_db()
 
-# ======================= BASE LAYOUT =======================
+# -------------------- OPENAI SETUP --------------------
+client = OpenAI()  # uses OPENAI_API_KEY from environment
+
+AI_SYSTEM_PROMPT = """
+You are CareerInn's AI career guide for hospitality and hotel management in Hyderabad.
+
+Your job:
+- Talk like a friendly senior / mentor.
+- Ask the student structured questions step by step, not all at once.
+
+Ask in this order (one or two at a time, in separate turns):
+1) Name and current education (10th/12th/degree, stream, completion year).
+2) Marks / percentage in 10th and 12th (or diploma).
+3) Budget per year for fees (approx) and whether they are okay with loans.
+4) Preference: Hyderabad only, Telangana, India, or abroad later.
+5) Interest area: front office, F&B service, culinary/chef, bakery, housekeeping, cruise, aviation, tourism, etc.
+6) Comfort with long working hours, shifts, and relocations.
+7) If they want quick job after 3 years or long-term growth / abroad.
+
+Then:
+- Use their budget + preference to suggest 3–5 suitable college/path options.
+- Focus on hospitality / hotel management in Hyderabad and similar.
+- Talk in ranges for fees (low / mid / high), not exact rupees.
+- Mention general college examples like:
+  IHM Hyderabad, NITHM, IIHM Hyderabad, Regency, IHM Shri Shakti, Westin, Malla Reddy University, etc.
+- You do NOT need exact course details, only guidance-level advice.
+
+Very important:
+- Make it clear this is guidance, not final admission advice.
+- At the end of a recommendation block, clearly say:
+  "To turn this into a clear plan for you, please connect to a CareerInn mentor from the Mentorship section."
+
+Style:
+- Short paragraphs, simple English, friendly tone.
+- Do NOT talk about being an AI model.
+"""
+
+
+# -------------------- BASE LAYOUT --------------------
 BASE_HTML = """
 <!DOCTYPE html>
 <html lang="en">
@@ -217,87 +271,17 @@ BASE_HTML = """
 </html>
 """
 
+
 def render_page(content_html, title="CareerInn"):
     return render_template_string(BASE_HTML, content=content_html, title=title)
 
-# ======================= HELPER FOR AI BOT =======================
-def recommend_for_preferences(budget_code, min_rating):
-    """Return 3 recommended colleges based on budget bucket + rating."""
-    conn = sqlite3.connect(DB)
-    c = conn.cursor()
 
-    query = "SELECT name, location, fees, course, rating FROM colleges WHERE 1=1"
-    params = []
-
-    if budget_code == "lt1":
-        query += " AND fees < ?"
-        params.append(100000)
-    elif budget_code == "b2_3":
-        query += " AND fees BETWEEN ? AND ?"
-        params.extend([200000, 300000])
-    elif budget_code == "gt3":
-        query += " AND fees > ?"
-        params.append(300000)
-
-    if min_rating:
-        query += " AND rating >= ?"
-        params.append(min_rating)
-
-    query += " ORDER BY rating DESC LIMIT 3"
-
-    c.execute(query, params)
-    rows = c.fetchall()
-    conn.close()
-    return rows
-
-def analyse_message_for_prefs(message):
-    """Very simple rule-based 'AI' to decode budget + rating preference."""
-    text = message.lower()
-    budget_code = None
-    rating = 3.5
-
-    if "below" in text or "<" in text or "less" in text or "cheap" in text or "low budget" in text or "1 lakh" in text or "1,00,000" in text:
-        budget_code = "lt1"
-    elif "2 lakh" in text or "2,00,000" in text or "3 lakh" in text or "3,00,000" in text or "medium" in text:
-        budget_code = "b2_3"
-    elif "3+" in text or "premium" in text or "expensive" in text or "high budget" in text:
-        budget_code = "gt3"
-
-    if "only top" in text or "best only" in text or "top 3" in text:
-        rating = 4.5
-    elif "top" in text or "best" in text or "good college" in text:
-        rating = 4.0
-
-    return budget_code, rating
-
-def build_ai_reply(message):
-    """Return a bot reply string for the given user message."""
-    budget_code, rating_min = analyse_message_for_prefs(message)
-    recos = recommend_for_preferences(budget_code, rating_min)
-
-    # If nothing matches, relax filters
-    if not recos:
-        recos = recommend_for_preferences(None, 3.5)
-
-    lines = []
-    lines.append("Got it. Based on what you shared, here are some options in Hyderabad:")
-
-    for name, loc, fees, course, rating in recos:
-        lines.append(f"- {name} · {course} · {loc} · ~₹{fees:,}/year · {rating:.1f}★")
-
-    lines.append("")
-    lines.append("These are indicative suggestions. For a personalised plan,")
-    lines.append("**please connect to a CareerInn mentor for a one-to-one discussion.**")
-
-    return "\n".join(lines)
-
-# ======================= HOME (dynamic CTA) =======================
+# -------------------- HOME (dynamic CTA) --------------------
 @app.route("/")
 def home():
     ai_used = session.get("ai_used", False)
 
     if not ai_used:
-        # First time: push Signup / Login / Free AI Chat
         cta_html = """
           <div class="flex flex-wrap items-center gap-3 mt-3">
             <a href="/signup" class="primary-cta">Create free account</a>
@@ -309,7 +293,6 @@ def home():
           <p class="hero-footnote">First AI chat is free. After that, guidance continues inside the ₹299/year pass.</p>
         """
     else:
-        # After using AI once: show Get started – ₹299
         cta_html = """
           <div class="flex flex-wrap items-center gap-4 mt-3">
             <a href="/signup" class="primary-cta">
@@ -410,7 +393,8 @@ def home():
     """
     return render_page(content, "CareerInn | Home")
 
-# ======================= AUTH (SIGNUP / LOGIN) =======================
+
+# -------------------- AUTH (SIGNUP / LOGIN) --------------------
 SIGNUP_FORM = """
 <form method="POST" class="auth-card">
   <h2 class="text-xl font-bold mb-4">Create your CareerInn account</h2>
@@ -436,6 +420,7 @@ LOGIN_FORM = """
 </form>
 """
 
+
 @app.route("/signup", methods=["GET", "POST"])
 def signup():
     if request.method == "POST":
@@ -443,22 +428,22 @@ def signup():
         email = request.form.get("email", "").strip().lower()
         password = request.form.get("password", "").strip()
 
-        conn = sqlite3.connect(DB)
-        c = conn.cursor()
-        try:
-            c.execute("INSERT INTO users(name,email,password) VALUES(?,?,?)",
-                      (name, email, password))
-            conn.commit()
-        except sqlite3.IntegrityError:
-            conn.close()
+        db = get_db()
+        if db.query(User).filter_by(email=email).first():
+            db.close()
             return render_page(
                 "<p class='text-red-400 text-sm mb-3'>Email already exists.</p>" + SIGNUP_FORM,
                 "Signup"
             )
-        conn.close()
+
+        user = User(name=name, email=email, password=password)
+        db.add(user)
+        db.commit()
+        db.close()
         return redirect("/login")
 
     return render_page(SIGNUP_FORM, "Signup")
+
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
@@ -466,15 +451,13 @@ def login():
         email = request.form.get("email", "").strip().lower()
         password = request.form.get("password", "").strip()
 
-        conn = sqlite3.connect(DB)
-        c = conn.cursor()
-        c.execute("SELECT * FROM users WHERE email=? AND password=?", (email, password))
-        user = c.fetchone()
-        conn.close()
+        db = get_db()
+        user = db.query(User).filter_by(email=email, password=password).first()
+        db.close()
 
         if user:
-            session["user"] = user[1]  # name
-            return redirect("/dashboard")
+            session["user"] = user.name
+            return redirect("/")  # go to HOME after login
         else:
             return render_page(
                 "<p class='text-red-400 text-sm mb-3'>Invalid email or password.</p>" + LOGIN_FORM,
@@ -483,12 +466,14 @@ def login():
 
     return render_page(LOGIN_FORM, "Login")
 
+
 @app.route("/logout")
 def logout():
     session.clear()
     return redirect("/")
 
-# ======================= DASHBOARD =======================
+
+# -------------------- DASHBOARD --------------------
 @app.route("/dashboard")
 def dashboard():
     if "user" not in session:
@@ -510,51 +495,42 @@ def dashboard():
     """
     return render_page(content, "Dashboard")
 
-# ======================= COURSES (budget + rating filters) =======================
+
+# -------------------- COURSES (budget + rating filters) --------------------
 @app.route("/courses")
 def courses():
     budget = request.args.get("budget", "").strip()
     rating_min = request.args.get("rating", "").strip()
 
-    conn = sqlite3.connect(DB)
-    c = conn.cursor()
+    db = get_db()
+    query = db.query(College)
 
-    query = "SELECT * FROM colleges WHERE 1=1"
-    params = []
-
-    # Budget buckets
     if budget == "lt1":
-        query += " AND fees < ?"
-        params.append(100000)
+        query = query.filter(College.fees < 100000)
     elif budget == "b2_3":
-        query += " AND fees BETWEEN ? AND ?"
-        params.extend([200000, 300000])
+        query = query.filter(College.fees.between(200000, 300000))
     elif budget == "gt3":
-        query += " AND fees > ?"
-        params.append(300000)
+        query = query.filter(College.fees > 300000)
 
-    # Rating filter
     if rating_min:
         try:
             rating_val = float(rating_min)
-            query += " AND rating >= ?"
-            params.append(rating_val)
+            query = query.filter(College.rating >= rating_val)
         except ValueError:
             pass
 
-    c.execute(query, params)
-    data = c.fetchall()
-    conn.close()
+    data = query.order_by(College.rating.desc()).all()
+    db.close()
 
     rows = ""
     for col in data:
         rows += f"""
         <tr>
-          <td>{col[1]}</td>
-          <td>{col[4]}</td>
-          <td>{col[2]}</td>
-          <td>₹{col[3]:,}</td>
-          <td>{col[5]:.1f}★</td>
+          <td>{col.name}</td>
+          <td>{col.course}</td>
+          <td>{col.location}</td>
+          <td>₹{col.fees:,}</td>
+          <td>{col.rating:.1f}★</td>
         </tr>
         """
 
@@ -613,23 +589,22 @@ def courses():
     """
     return render_page(content, "Courses & Colleges")
 
-# ======================= MENTORSHIP =======================
+
+# -------------------- MENTORSHIP --------------------
 @app.route("/mentorship")
 def mentorship():
-    conn = sqlite3.connect(DB)
-    c = conn.cursor()
-    c.execute("SELECT * FROM mentors")
-    data = c.fetchall()
-    conn.close()
+    db = get_db()
+    data = db.query(Mentor).all()
+    db.close()
 
     cards = ""
     for m in data:
         cards += f"""
         <div class="mentor-card">
-          <h3 class="text-lg font-bold mb-1">{m[1]}</h3>
-          <p class="text-sm text-gray-300">{m[2]}</p>
-          <p class="text-sm text-indigo-300 mb-2">{m[3]}</p>
-          <a href="/book-mentor/{m[0]}" class="mt-2 inline-block text-xs px-3 py-1 bg-indigo-600 rounded">
+          <h3 class="text-lg font-bold mb-1">{m.name}</h3>
+          <p class="text-sm text-gray-300">{m.experience}</p>
+          <p class="text-sm text-indigo-300 mb-2">{m.speciality}</p>
+          <a href="/book-mentor/{m.id}" class="mt-2 inline-block text-xs px-3 py-1 bg-indigo-600 rounded">
             Book Session (demo)
           </a>
         </div>
@@ -644,13 +619,12 @@ def mentorship():
     """
     return render_page(content, "Mentorship")
 
+
 @app.route("/book-mentor/<int:mentor_id>", methods=["GET", "POST"])
 def book_mentor(mentor_id):
-    conn = sqlite3.connect(DB)
-    c = conn.cursor()
-    c.execute("SELECT * FROM mentors WHERE id=?", (mentor_id,))
-    mentor = c.fetchone()
-    conn.close()
+    db = get_db()
+    mentor = db.query(Mentor).get(mentor_id)
+    db.close()
 
     if not mentor:
         return redirect("/mentorship")
@@ -659,7 +633,7 @@ def book_mentor(mentor_id):
         content = f"""
         <h2 class="text-2xl font-bold mb-4">Session Request Sent</h2>
         <p class="text-gray-300 mb-3 text-sm">
-          Your request to connect with <span class="text-indigo-300 font-semibold">{mentor[1]}</span> has been received (demo only).
+          Your request to connect with <span class="text-indigo-300 font-semibold">{mentor.name}</span> has been received (demo only).
         </p>
         <a href="/mentorship" class="px-4 py-2 bg-indigo-600 rounded text-sm">Back to mentors</a>
         """
@@ -668,7 +642,7 @@ def book_mentor(mentor_id):
     content = f"""
     <h2 class="text-2xl font-bold mb-4">Book Mentor Session</h2>
     <p class="text-gray-300 mb-4 text-sm">
-      Mentor: <span class="text-indigo-300 font-semibold">{mentor[1]}</span> (details ...).
+      Mentor: <span class="text-indigo-300 font-semibold">{mentor.name}</span> (details ...).
     </p>
     <form method="POST" class="auth-card">
       <input name="student_name" placeholder="Your name ..." class="input-box">
@@ -679,23 +653,22 @@ def book_mentor(mentor_id):
     """
     return render_page(content, "Book Mentor")
 
-# ======================= JOBS = PLACEMENTS SNAPSHOT =======================
+
+# -------------------- JOBS = PLACEMENTS SNAPSHOT --------------------
 @app.route("/jobs")
 def jobs():
-    conn = sqlite3.connect(DB)
-    c = conn.cursor()
-    c.execute("SELECT * FROM jobs")
-    data = c.fetchall()
-    conn.close()
+    db = get_db()
+    data = db.query(Job).all()
+    db.close()
 
     cards = ""
     for j in data:
         cards += f"""
         <div class="job-card">
-          <h3 class="font-bold text-sm md:text-base mb-1">{j[1]}</h3>
-          <p class="text-indigo-300 text-xs md:text-sm">Top recruiter: {j[2]}</p>
-          <p class="text-gray-400 text-xs md:text-sm">Location: {j[3]}</p>
-          <p class="text-green-300 font-semibold text-xs md:text-sm mt-1">{j[4]}</p>
+          <h3 class="font-bold text-sm md:text-base mb-1">{j.title}</h3>
+          <p class="text-indigo-300 text-xs md:text-sm">Top recruiter: {j.company}</p>
+          <p class="text-gray-400 text-xs md:text-sm">Location: {j.location}</p>
+          <p class="text-green-300 font-semibold text-xs md:text-sm mt-1">{j.salary}</p>
         </div>
         """
 
@@ -711,72 +684,85 @@ def jobs():
     """
     return render_page(content, "Jobs & Placements")
 
-# ======================= AI CAREER BOT =======================
+
+# -------------------- AI CAREER BOT (OpenAI gpt-4.1-mini) --------------------
 @app.route("/ai-bot", methods=["GET", "POST"])
 def ai_bot():
-    # keep small chat history in session
     history = session.get("ai_history", [])
-    bot_reply = None
 
     if request.method == "POST":
         user_msg = request.form.get("message", "").strip()
         if user_msg:
-            # mark that user used AI once
             session["ai_used"] = True
+            history.append({"role": "user", "content": user_msg})
 
-            # store user message
-            history.append(("user", user_msg))
+            messages = [{"role": "system", "content": AI_SYSTEM_PROMPT}]
+            for h in history[-10:]:
+                messages.append({"role": h["role"], "content": h["content"]})
 
-            # generate reply using rule-based recommender
-            reply_text = build_ai_reply(user_msg)
-            history.append(("bot", reply_text))
+            try:
+                resp = client.chat.completions.create(
+                    model="gpt-4.1-mini",
+                    messages=messages,
+                    temperature=0.6,
+                )
+                bot_text = resp.choices[0].message.content
+            except Exception:
+                bot_text = (
+                    "Sorry, I'm having trouble replying right now. "
+                    "Please try again in a minute, or directly connect with a CareerInn mentor."
+                )
 
-            bot_reply = reply_text
+            history.append({"role": "assistant", "content": bot_text})
+            session["ai_history"] = history
 
-        session["ai_history"] = history
-
-    # build HTML bubbles
-    bubbles = ""
-    for role, msg in history:
-        safe = html.escape(msg).replace("\n", "<br>")
-        if role == "user":
-            bubbles += f"""
-            <div class="flex justify-end mb-2">
-              <div class="max-w-xs md:max-w-md bg-indigo-600 text-white text-xs md:text-sm px-3 py-2 rounded-2xl rounded-br-sm">
-                {safe}
-              </div>
-            </div>
-            """
-        else:
-            bubbles += f"""
-            <div class="flex justify-start mb-2">
-              <div class="max-w-xs md:max-w-md bg-slate-800 text-slate-100 text-xs md:text-sm px-3 py-2 rounded-2xl rounded-bl-sm">
-                {safe}
-              </div>
-            </div>
-            """
+    if not history:
+        bubbles = """
+        <div class='text-xs text-slate-400'>
+          Start by telling me, for example: <br>
+          <span class='text-slate-200'>
+            “My name is Arjun, I finished 12th with 80% (MPC), my budget is 2–3 lakhs per year and I like culinary.”
+          </span>
+        </div>
+        """
+    else:
+        bubbles = ""
+        for h in history:
+            safe = html.escape(h["content"]).replace("\n", "<br>")
+            if h["role"] == "user":
+                bubbles += f"""
+                <div class="flex justify-end mb-2">
+                  <div class="max-w-xs md:max-w-md bg-indigo-600 text-white text-xs md:text-sm px-3 py-2 rounded-2xl rounded-br-sm">
+                    {safe}
+                  </div>
+                </div>
+                """
+            else:
+                bubbles += f"""
+                <div class="flex justify-start mb-2">
+                  <div class="max-w-xs md:max-w-md bg-slate-800 text-slate-100 text-xs md:text-sm px-3 py-2 rounded-2xl rounded-bl-sm">
+                    {safe}
+                  </div>
+                </div>
+                """
 
     content = f"""
     <div class="max-w-4xl mx-auto space-y-4">
       <h2 class="text-3xl font-bold mb-1">AI Career Guide for Hospitality</h2>
       <p class="text-sm text-slate-300 mb-4">
-        Tell the bot about you (e.g., marks, budget, city preference, interest like chef/front office/abroad).
-        It will suggest a Hyderabad college path, and finally ask you to connect with a mentor.
+        I will ask a few simple questions about your marks, budget and interests,
+        then suggest a hotel management path and colleges. At the end I'll ask you
+        to please connect with a human mentor on CareerInn.
       </p>
 
       <div class="bg-[#050816] border border-slate-800 rounded-2xl p-4 md:p-5 h-[430px] flex flex-col">
         <div class="flex-1 overflow-y-auto pr-1 custom-scroll">
-          {bubbles if bubbles else """
-          <div class='text-xs text-slate-400'>
-            Start by typing something like: <br>
-            <span class='text-slate-200'>“I scored 80% in 12th, my budget is around 2–3 lakhs per year and I like culinary.”</span>
-          </div>
-          """}
+          {bubbles}
         </div>
 
         <form method="POST" class="mt-3 flex gap-2">
           <input name="message" autocomplete="off"
-                 placeholder="Type your question or profile here..."
+                 placeholder="Type your answer or question here..."
                  class="flex-1 search-bar">
           <button class="px-4 py-2 bg-indigo-600 rounded-full text-xs md:text-sm">
             Send
@@ -785,14 +771,14 @@ def ai_bot():
       </div>
 
       <p class="text-[11px] text-slate-400">
-        This is a prototype rule-based AI. Final product can plug into OpenAI or a custom model for deeper guidance.
-        For a human review of this suggestion, please use the Mentorship section.
+        Prototype only – this AI uses general guidance. Final decisions should be taken after talking to a CareerInn mentor.
       </p>
     </div>
     """
     return render_page(content, "AI Career Bot")
 
-# ======================= SUPPORT =======================
+
+# -------------------- SUPPORT --------------------
 @app.route("/support")
 def support():
     content = """
@@ -805,6 +791,7 @@ def support():
     """
     return render_page(content, "Support")
 
-# ======================= MAIN =======================
+
+# -------------------- MAIN --------------------
 if __name__ == "__main__":
     app.run(debug=True)
