@@ -1,5 +1,6 @@
 from flask import Flask, request, redirect, session, render_template_string
 import sqlite3
+import html
 
 app = Flask(__name__)
 app.secret_key = "careerinn_secure_key"
@@ -191,6 +192,7 @@ BASE_HTML = """
       <a href="/courses" class="hover:text-indigo-400">Courses</a>
       <a href="/mentorship" class="hover:text-indigo-400">Mentorship</a>
       <a href="/jobs" class="hover:text-indigo-400">Jobs</a>
+      <a href="/ai-bot" class="hover:text-indigo-400">AI Career Bot</a>
       <a href="/support" class="hover:text-indigo-400">Support</a>
 
       {% if session.get('user') %}
@@ -218,10 +220,114 @@ BASE_HTML = """
 def render_page(content_html, title="CareerInn"):
     return render_template_string(BASE_HTML, content=content_html, title=title)
 
-# ======================= HOME =======================
+# ======================= HELPER FOR AI BOT =======================
+def recommend_for_preferences(budget_code, min_rating):
+    """Return 3 recommended colleges based on budget bucket + rating."""
+    conn = sqlite3.connect(DB)
+    c = conn.cursor()
+
+    query = "SELECT name, location, fees, course, rating FROM colleges WHERE 1=1"
+    params = []
+
+    if budget_code == "lt1":
+        query += " AND fees < ?"
+        params.append(100000)
+    elif budget_code == "b2_3":
+        query += " AND fees BETWEEN ? AND ?"
+        params.extend([200000, 300000])
+    elif budget_code == "gt3":
+        query += " AND fees > ?"
+        params.append(300000)
+
+    if min_rating:
+        query += " AND rating >= ?"
+        params.append(min_rating)
+
+    query += " ORDER BY rating DESC LIMIT 3"
+
+    c.execute(query, params)
+    rows = c.fetchall()
+    conn.close()
+    return rows
+
+def analyse_message_for_prefs(message):
+    """Very simple rule-based 'AI' to decode budget + rating preference."""
+    text = message.lower()
+    budget_code = None
+    rating = 3.5
+
+    if "below" in text or "<" in text or "less" in text or "cheap" in text or "low budget" in text or "1 lakh" in text or "1,00,000" in text:
+        budget_code = "lt1"
+    elif "2 lakh" in text or "2,00,000" in text or "3 lakh" in text or "3,00,000" in text or "medium" in text:
+        budget_code = "b2_3"
+    elif "3+" in text or "premium" in text or "expensive" in text or "high budget" in text:
+        budget_code = "gt3"
+
+    if "only top" in text or "best only" in text or "top 3" in text:
+        rating = 4.5
+    elif "top" in text or "best" in text or "good college" in text:
+        rating = 4.0
+
+    return budget_code, rating
+
+def build_ai_reply(message):
+    """Return a bot reply string for the given user message."""
+    budget_code, rating_min = analyse_message_for_prefs(message)
+    recos = recommend_for_preferences(budget_code, rating_min)
+
+    # If nothing matches, relax filters
+    if not recos:
+        recos = recommend_for_preferences(None, 3.5)
+
+    lines = []
+    lines.append("Got it. Based on what you shared, here are some options in Hyderabad:")
+
+    for name, loc, fees, course, rating in recos:
+        lines.append(f"- {name} · {course} · {loc} · ~₹{fees:,}/year · {rating:.1f}★")
+
+    lines.append("")
+    lines.append("These are indicative suggestions. For a personalised plan,")
+    lines.append("**please connect to a CareerInn mentor for a one-to-one discussion.**")
+
+    return "\n".join(lines)
+
+# ======================= HOME (dynamic CTA) =======================
 @app.route("/")
 def home():
-    content = """
+    ai_used = session.get("ai_used", False)
+
+    if not ai_used:
+        # First time: push Signup / Login / Free AI Chat
+        cta_html = """
+          <div class="flex flex-wrap items-center gap-3 mt-3">
+            <a href="/signup" class="primary-cta">Create free account</a>
+            <a href="/login" class="ghost-cta">Sign in</a>
+            <a href="/ai-bot" class="px-4 py-2 rounded-full border border-emerald-400/70 text-xs md:text-sm hover:bg-emerald-500/10">
+              🤖 Try free AI career chat
+            </a>
+          </div>
+          <p class="hero-footnote">First AI chat is free. After that, guidance continues inside the ₹299/year pass.</p>
+        """
+    else:
+        # After using AI once: show Get started – ₹299
+        cta_html = """
+          <div class="flex flex-wrap items-center gap-4 mt-3">
+            <a href="/signup" class="primary-cta">
+              🚀 Get started – ₹299 / year
+            </a>
+            <a href="/login" class="ghost-cta">
+              Already have an account?
+            </a>
+            <a href="/ai-bot" class="px-4 py-2 rounded-full border border-emerald-400/70 text-xs md:text-sm hover:bg-emerald-500/10">
+              🤖 Continue with AI guidance
+            </a>
+          </div>
+          <p class="hero-footnote">
+            ₹299 per student (prototype – real data & payments can plug in later).
+          </p>
+        """
+
+    content = f"""
     <div class="max-w-5xl mx-auto mt-6 md:mt-10 space-y-12 hero-shell">
 
       <!-- HERO -->
@@ -238,21 +344,10 @@ def home():
           </h1>
 
           <p class="text-sm md:text-[15px] text-slate-300">
-            One simple yearly pass that puts colleges, mentors and jobs in a single platform.
+            One simple yearly pass that puts colleges, mentors, jobs and an AI career guide in a single platform.
           </p>
 
-          <div class="flex flex-wrap items-center gap-4 mt-3">
-            <a href="/signup" class="primary-cta">
-              🚀 Get started – ₹299 / year
-            </a>
-            <a href="/login" class="ghost-cta">
-              Already have an account?
-            </a>
-          </div>
-
-          <p class="hero-footnote">
-            ₹299 per student (prototype – real data & payments can plug in later).
-          </p>
+          {cta_html}
         </div>
 
         <!-- RIGHT: STUDENT PASS CARD -->
@@ -271,10 +366,11 @@ def home():
           </p>
 
           <ul class="text-[12px] text-slate-200 space-y-1.5 mt-3">
-            <li>• College explorer along with courses</li>
+            <li>• Hyderabad hotel-management courses &amp; colleges</li>
             <li>• Mentor connect flow with request form</li>
-            <li>• Job &amp; internship apply flow (demo only)</li>
-            <li>⭐ <b>100% Guaranteed Job &amp; Internship Guidance</b></li>
+            <li>• Job &amp; internship placements snapshot</li>
+            <li>• AI-based college &amp; path suggestion chat</li>
+            <li>⭐ <b>100% Job &amp; Internship Guidance (with mentors)</b></li>
           </ul>
         </div>
       </section>
@@ -296,7 +392,7 @@ def home():
 
           <a href="/mentorship" class="feature-card">
             🧑‍🏫 Mentorship
-            <p class="sub">Guidance from industry mentors (demo).</p>
+            <p class="sub">Talk to hospitality mentors (demo).</p>
           </a>
 
           <a href="/jobs" class="feature-card">
@@ -304,9 +400,9 @@ def home():
             <p class="sub">Avg packages &amp; recruiters snapshot.</p>
           </a>
 
-          <a href="/support" class="feature-card">
-            🆘 24/7 Support
-            <p class="sub">Student help &amp; support details.</p>
+          <a href="/ai-bot" class="feature-card">
+            🤖 AI Career Bot
+            <p class="sub">Chat to get a suggested path.</p>
           </a>
         </div>
       </section>
@@ -615,44 +711,86 @@ def jobs():
     """
     return render_page(content, "Jobs & Placements")
 
-# (Optional: keep apply-job as a demo flow, now more generic)
-@app.route("/apply-job/<int:job_id>", methods=["GET", "POST"])
-def apply_job(job_id):
-    conn = sqlite3.connect(DB)
-    c = conn.cursor()
-    c.execute("SELECT * FROM jobs WHERE id=?", (job_id,))
-    job = c.fetchone()
-    conn.close()
-
-    if not job:
-        return redirect("/jobs")
+# ======================= AI CAREER BOT =======================
+@app.route("/ai-bot", methods=["GET", "POST"])
+def ai_bot():
+    # keep small chat history in session
+    history = session.get("ai_history", [])
+    bot_reply = None
 
     if request.method == "POST":
-        content = f"""
-        <h2 class="text-2xl font-bold mb-4">Interest Submitted</h2>
-        <p class="text-gray-300 mb-3 text-sm">
-          Your interest in a placement similar to
-          <span class="text-indigo-300 font-semibold">{job[1]}</span>
-          has been recorded (demo only).
-        </p>
-        <a href="/jobs" class="px-4 py-2 bg-indigo-600 rounded text-sm">Back to placements</a>
-        """
-        return render_page(content, "Placement Interest")
+        user_msg = request.form.get("message", "").strip()
+        if user_msg:
+            # mark that user used AI once
+            session["ai_used"] = True
+
+            # store user message
+            history.append(("user", user_msg))
+
+            # generate reply using rule-based recommender
+            reply_text = build_ai_reply(user_msg)
+            history.append(("bot", reply_text))
+
+            bot_reply = reply_text
+
+        session["ai_history"] = history
+
+    # build HTML bubbles
+    bubbles = ""
+    for role, msg in history:
+        safe = html.escape(msg).replace("\n", "<br>")
+        if role == "user":
+            bubbles += f"""
+            <div class="flex justify-end mb-2">
+              <div class="max-w-xs md:max-w-md bg-indigo-600 text-white text-xs md:text-sm px-3 py-2 rounded-2xl rounded-br-sm">
+                {safe}
+              </div>
+            </div>
+            """
+        else:
+            bubbles += f"""
+            <div class="flex justify-start mb-2">
+              <div class="max-w-xs md:max-w-md bg-slate-800 text-slate-100 text-xs md:text-sm px-3 py-2 rounded-2xl rounded-bl-sm">
+                {safe}
+              </div>
+            </div>
+            """
 
     content = f"""
-    <h2 class="text-2xl font-bold mb-4">Show Interest in Similar Placement</h2>
-    <p class="text-gray-300 mb-4 text-sm">
-      Role example: <span class="text-indigo-300 font-semibold">{job[1]}</span><br>
-      Recruiter: {job[2]} | Location: {job[3]} | Package: {job[4]}
-    </p>
-    <form method="POST" class="auth-card" enctype="multipart/form-data">
-      <input name="name" placeholder="Your name ..." class="input-box">
-      <input name="email" placeholder="Your email ..." class="input-box">
-      <input name="phone" placeholder="Phone number ..." class="input-box">
-      <button class="submit-btn">Submit (demo)</button>
-    </form>
+    <div class="max-w-4xl mx-auto space-y-4">
+      <h2 class="text-3xl font-bold mb-1">AI Career Guide for Hospitality</h2>
+      <p class="text-sm text-slate-300 mb-4">
+        Tell the bot about you (e.g., marks, budget, city preference, interest like chef/front office/abroad).
+        It will suggest a Hyderabad college path, and finally ask you to connect with a mentor.
+      </p>
+
+      <div class="bg-[#050816] border border-slate-800 rounded-2xl p-4 md:p-5 h-[430px] flex flex-col">
+        <div class="flex-1 overflow-y-auto pr-1 custom-scroll">
+          {bubbles if bubbles else """
+          <div class='text-xs text-slate-400'>
+            Start by typing something like: <br>
+            <span class='text-slate-200'>“I scored 80% in 12th, my budget is around 2–3 lakhs per year and I like culinary.”</span>
+          </div>
+          """}
+        </div>
+
+        <form method="POST" class="mt-3 flex gap-2">
+          <input name="message" autocomplete="off"
+                 placeholder="Type your question or profile here..."
+                 class="flex-1 search-bar">
+          <button class="px-4 py-2 bg-indigo-600 rounded-full text-xs md:text-sm">
+            Send
+          </button>
+        </form>
+      </div>
+
+      <p class="text-[11px] text-slate-400">
+        This is a prototype rule-based AI. Final product can plug into OpenAI or a custom model for deeper guidance.
+        For a human review of this suggestion, please use the Mentorship section.
+      </p>
+    </div>
     """
-    return render_page(content, "Apply Job")
+    return render_page(content, "AI Career Bot")
 
 # ======================= SUPPORT =======================
 @app.route("/support")
