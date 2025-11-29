@@ -6,7 +6,6 @@ from flask import (
     session,
     render_template_string,
 )
-from groq import Groq
 from sqlalchemy import (
     create_engine,
     Column,
@@ -18,11 +17,19 @@ from sqlalchemy import (
 from sqlalchemy.orm import declarative_base, sessionmaker, scoped_session
 
 # -------------------- FLASK + OPENAI SETUP --------------------
+from groq import Groq
+
 app = Flask(__name__)
 app.secret_key = os.getenv("FLASK_SECRET_KEY", "careerinn_secure_key")
 
-# Groq client (uses GROQ_API_KEY env var on Render)
-client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
+
+def get_groq_client():
+    """Create a Groq client when needed."""
+    api_key = os.environ.get("GROQ_API_KEY")
+    if not api_key:
+        return None
+    return Groq(api_key=api_key)
+
 
 
 # -------------------- DB SETUP (POSTGRES / SQLITE) --------------------
