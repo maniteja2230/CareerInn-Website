@@ -521,6 +521,13 @@ def support():
 
 
 # ======================= MAIN =======================
-if __name__ == "__main__":
+# ------------------- MAIN -------------------
+@app.before_first_request
+def setup():
+    # This runs once when the first request comes in
     init_db()
+
+if __name__ == "__main__":
+    # Local run
     app.run(debug=True)
+
