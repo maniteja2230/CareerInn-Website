@@ -19,13 +19,16 @@ def init_db():
         )
     """)
 
+    # Rebuild colleges with course + rating columns
+    c.execute("DROP TABLE IF EXISTS colleges")
     c.execute("""
         CREATE TABLE IF NOT EXISTS colleges(
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT,
             location TEXT,
             fees INT,
-            placements TEXT
+            course TEXT,
+            rating REAL
         )
     """)
 
@@ -48,53 +51,61 @@ def init_db():
         )
     """)
 
-    # ---------- REAL HYDERABAD HM COLLEGES (approx yearly fees) ----------
+    # ---------- HYDERABAD HM COLLEGES + COURSES + RATING ----------
     colleges_seed = [
-        ("IHM Hyderabad (IHMH)", "DD Colony, Hyderabad", 120000,
-         "Govt. hotel management institute, national-level placements"),
+        ("IHM Hyderabad (IHMH)", "DD Colony, Hyderabad", 320000,
+         "BSc in Hospitality & Hotel Administration", 4.6),
 
-        ("NITHM Hyderabad", "Gachibowli, Hyderabad", 130000,
-         "Tourism & hospitality institute with campus placements"),
+        ("NITHM Hyderabad", "Gachibowli, Hyderabad", 280000,
+         "BBA in Tourism & Hospitality", 4.3),
 
-        ("IIHM Hyderabad", "Somajiguda, Hyderabad", 150000,
-         "International hotel management network, industry tie-ups"),
+        ("IIHM Hyderabad", "Somajiguda, Hyderabad", 350000,
+         "BA in Hospitality Management", 4.5),
 
-        ("Regency College of Culinary Arts & Hotel Management", "Himayatnagar, Hyderabad", 120000,
-         "Strong culinary focus, good city hotel placements"),
+        ("Regency College of Culinary Arts & Hotel Management", "Himayatnagar, Hyderabad", 240000,
+         "BHM & Culinary Arts", 4.4),
 
-        ("IHM Shri Shakti", "Kompally, Hyderabad", 121000,
-         "Affiliated to NCHM, hospitality & hotel admin"),
+        ("IHM Shri Shakti", "Kompally, Hyderabad", 260000,
+         "BSc Hotel Management & Catering", 4.2),
 
-        ("Chennais Amirta IHM – Hyderabad", "Khairatabad, Hyderabad", 100000,
-         "Diploma, UG and PG hotel management with placement assistance"),
+        ("Chennais Amirta IHM – Hyderabad", "Khairatabad, Hyderabad", 180000,
+         "Diploma in Hotel Management", 4.0),
 
-        ("Westin College of Hotel Management", "Nizampet, Hyderabad", 100000,
-         "Affiliated to Osmania University, offers national & international placements"),
+        ("Westin College of Hotel Management", "Nizampet, Hyderabad", 190000,
+         "Bachelor of Hotel Management (BHM)", 3.9),
 
-        ("Malla Reddy University – Hotel Management", "Maisammaguda, Hyderabad", 110000,
-         "University campus with hotel management specialisations"),
+        ("Malla Reddy University – Hotel Management", "Maisammaguda, Hyderabad", 210000,
+         "BSc Hotel Management", 4.1),
 
-        ("SIITAM Hyderabad", "Tarnaka, Hyderabad", 103000,
-         "Hotel management programmes with industry exposure"),
+        ("SIITAM Hyderabad", "Tarnaka, Hyderabad", 170000,
+         "BHM", 3.8),
 
-        ("Zest College of Hotel Management", "Hyderabad", 65000,
-         "Budget-focused hotel management college"),
+        ("Zest College of Hotel Management", "Hyderabad", 90000,
+         "Diploma in Hotel Management", 3.7),
 
-        ("Roots Collegium – Hotel Management", "Somajiguda, Hyderabad", 110000,
-         "Hospitality, culinary & hotel management"),
+        ("Roots Collegium – Hotel Management", "Somajiguda, Hyderabad", 200000,
+         "BBA in Hotel Management", 4.0),
 
-        ("Aptech Aviation & Hospitality – Hyderabad", "Ameerpet, Hyderabad", 90000,
-         "Aviation + hospitality courses with placement support")
+        ("Aptech Aviation & Hospitality – Hyderabad", "Ameerpet, Hyderabad", 85000,
+         "Diploma in Aviation & Hospitality", 3.6),
+
+        ("St. Mary’s College – Hospitality", "Yousufguda, Hyderabad", 140000,
+         "BVoc Hospitality & Tourism", 3.9),
+
+        ("Aurora’s Degree College – Hotel Management", "Chikkadpally, Hyderabad", 160000,
+         "BHM", 3.8),
+
+        ("Global College of Hotel Management", "Kukatpally, Hyderabad", 95000,
+         "Diploma in Hotel Operations", 3.7)
     ]
 
-    # Always refresh colleges list with the latest seed
     c.execute("DELETE FROM colleges")
     c.executemany(
-        "INSERT INTO colleges(name,location,fees,placements) VALUES(?,?,?,?)",
+        "INSERT INTO colleges(name,location,fees,course,rating) VALUES(?,?,?,?,?)",
         colleges_seed
     )
 
-    # ----- keep your earlier demo seed for mentors & jobs -----
+    # ----- mentors seed (still demo) -----
     c.execute("SELECT COUNT(*) FROM mentors")
     if c.fetchone()[0] == 0:
         mentors_seed = [
@@ -107,12 +118,36 @@ def init_db():
             mentors_seed
         )
 
+    # ----- placements seed in jobs table -----
     c.execute("SELECT COUNT(*) FROM jobs")
     if c.fetchone()[0] == 0:
         jobs_seed = [
-            ("Job ... A", "Company ...", "Location ...", "Salary ..."),
-            ("Job ... B", "Company ...", "Location ...", "Salary ..."),
-            ("Job ... C", "Company ...", "Location ...", "Salary ...")
+            ("IHM Hyderabad – Management Trainee (Hotel Ops)",
+             "Taj / IHCL", "Pan India", "Avg package ~₹4.5–5.5 LPA"),
+
+            ("IHM Hyderabad – F&B Associate",
+             "Marriott Hotels", "Hyderabad / Bengaluru", "Avg package ~₹3–4 LPA"),
+
+            ("NITHM – Guest Relations Executive",
+             "ITC Hotels", "Hyderabad", "Avg package ~₹3.5–4.5 LPA"),
+
+            ("IIHM Hyderabad – Hospitality Management Trainee",
+             "Accor Hotels", "Pan India / Overseas", "Avg package ~₹4–6 LPA (varies)"),
+
+            ("Regency College – Commis Chef",
+             "5-star Hotels & QSR chains", "Hyderabad", "Avg package ~₹2.5–3.5 LPA"),
+
+            ("IHM Shri Shakti – Front Office Associate",
+             "Oberoi / Trident", "Metro cities", "Avg package ~₹3.5–4.5 LPA"),
+
+            ("Westin College – Hotel Operations Trainee",
+             "Hyatt Hotels", "Pan India", "Avg package ~₹3–4 LPA"),
+
+            ("Malla Reddy Univ – Hospitality Roles",
+             "Resorts & Cruise Lines", "India / Overseas", "Avg package ~₹3–6 LPA (role based)"),
+
+            ("Roots Collegium – Hospitality Placement",
+             "Retail & Hospitality Chains", "Hyderabad", "Avg package ~₹2.5–3.5 LPA")
         ]
         c.executemany(
             "INSERT INTO jobs(title,company,location,salary) VALUES(?,?,?,?)",
@@ -122,8 +157,7 @@ def init_db():
     conn.commit()
     conn.close()
 
-
-# run once on import (works locally + on Render)
+# run once on import
 init_db()
 
 # ======================= BASE LAYOUT =======================
@@ -217,7 +251,7 @@ def home():
           </div>
 
           <p class="hero-footnote">
-            ₹299 per student (demo prototype – real data can be integrated).
+            ₹299 per student (prototype – real data & payments can plug in later).
           </p>
         </div>
 
@@ -240,40 +274,45 @@ def home():
             <li>• College explorer along with courses</li>
             <li>• Mentor connect flow with request form</li>
             <li>• Job &amp; internship apply flow (demo only)</li>
-            <li>⭐ <b>100% Guaranteed Job & Internship Guidance</b></li>
+            <li>⭐ <b>100% Guaranteed Job &amp; Internship Guidance</b></li>
           </ul>
         </div>
       </section>
 
-      <!-- FEATURE MODULES (NOW 7 BOXES) -->
+      <!-- FEATURE CARDS -->
       <section class="space-y-4">
         <h3 class="text-sm font-semibold text-slate-200">CareerInn Spaces:</h3>
 
-        <div class="grid md:grid-cols-7 gap-4">
+        <div class="grid md:grid-cols-5 gap-4">
+          <a href="/courses" class="feature-card">
+            📘 Courses
+            <p class="sub">See key hospitality courses.</p>
+          </a>
 
-          <a href="/courses" class="feature-card">📘 Courses<p class="sub">Demo course access</p></a>
-          <a href="/courses" class="feature-card">🏫 Colleges<p class="sub">Search & compare</p></a>
-          <a href="/mentorship" class="feature-card">🧑‍🏫 Mentorship<p class="sub">Career guidance</p></a>
-          <a href="/jobs" class="feature-card">💼 Jobs<p class="sub">Job listings</p></a>
-          <a href="/jobs" class="feature-card">📋 Internships<p class="sub">Training roles</p></a>
+          <a href="/courses" class="feature-card">
+            🏫 Colleges
+            <p class="sub">Hyderabad hotel-management colleges.</p>
+          </a>
 
-          <!-- 🔥 Newly Added -->
-          <a href="/global-match" class="feature-card">
-            🌎 Global Match
-            <p class="sub">Worldwide college + internship pairing</p>
+          <a href="/mentorship" class="feature-card">
+            🧑‍🏫 Mentorship
+            <p class="sub">Guidance from industry mentors (demo).</p>
+          </a>
+
+          <a href="/jobs" class="feature-card">
+            💼 Jobs &amp; Placements
+            <p class="sub">Avg packages &amp; recruiters snapshot.</p>
           </a>
 
           <a href="/support" class="feature-card">
             🆘 24/7 Support
-            <p class="sub">Anytime student assistance</p>
+            <p class="sub">Student help &amp; support details.</p>
           </a>
-
         </div>
       </section>
     </div>
     """
     return render_page(content, "CareerInn | Home")
-
 
 # ======================= AUTH (SIGNUP / LOGIN) =======================
 SIGNUP_FORM = """
@@ -375,12 +414,11 @@ def dashboard():
     """
     return render_page(content, "Dashboard")
 
-# ======================= COURSES =======================
+# ======================= COURSES (budget + rating filters) =======================
 @app.route("/courses")
 def courses():
-    q = request.args.get("q", "").strip()
-    min_fee = request.args.get("min_fee", "").strip()
-    max_fee = request.args.get("max_fee", "").strip()
+    budget = request.args.get("budget", "").strip()
+    rating_min = request.args.get("rating", "").strip()
 
     conn = sqlite3.connect(DB)
     c = conn.cursor()
@@ -388,22 +426,25 @@ def courses():
     query = "SELECT * FROM colleges WHERE 1=1"
     params = []
 
-    if q:
-        like = f"%{q}%"
-        query += " AND (name LIKE ? OR location LIKE ?)"
-        params.extend([like, like])
+    # Budget buckets
+    if budget == "lt1":
+        query += " AND fees < ?"
+        params.append(100000)
+    elif budget == "b2_3":
+        query += " AND fees BETWEEN ? AND ?"
+        params.extend([200000, 300000])
+    elif budget == "gt3":
+        query += " AND fees > ?"
+        params.append(300000)
 
-    # budget filter
-    try:
-        if min_fee:
-            query += " AND fees >= ?"
-            params.append(int(min_fee))
-        if max_fee:
-            query += " AND fees <= ?"
-            params.append(int(max_fee))
-    except ValueError:
-        # if user types non-numeric, just ignore fee filters
-        pass
+    # Rating filter
+    if rating_min:
+        try:
+            rating_val = float(rating_min)
+            query += " AND rating >= ?"
+            params.append(rating_val)
+        except ValueError:
+            pass
 
     c.execute(query, params)
     data = c.fetchall()
@@ -414,36 +455,67 @@ def courses():
         rows += f"""
         <tr>
           <td>{col[1]}</td>
+          <td>{col[4]}</td>
           <td>{col[2]}</td>
           <td>₹{col[3]:,}</td>
-          <td>{col[4]}</td>
+          <td>{col[5]:.1f}★</td>
         </tr>
         """
 
     if not rows:
-        rows = "<tr><td colspan='4'>No colleges match this search / budget yet.</td></tr>"
+        rows = "<tr><td colspan='5'>No colleges match this budget / rating yet.</td></tr>"
+
+    sel_lt1   = "selected" if budget == "lt1" else ""
+    sel_b2_3  = "selected" if budget == "b2_3" else ""
+    sel_gt3   = "selected" if budget == "gt3" else ""
+    sel_any_b = "selected" if budget == "" else ""
+
+    sel_r_any = "selected" if rating_min == "" else ""
+    sel_r_35  = "selected" if rating_min == "3.5" else ""
+    sel_r_40  = "selected" if rating_min == "4.0" else ""
+    sel_r_45  = "selected" if rating_min == "4.5" else ""
 
     content = f"""
-    <h2 class="text-3xl font-bold mb-4">Hyderabad Hotel Management Colleges</h2>
+    <h2 class="text-3xl font-bold mb-4">Hyderabad Hotel Management – Courses &amp; Colleges</h2>
 
-    <form method="GET" class="mb-3 grid md:grid-cols-4 gap-2 items-center">
-      <input name="q" value="{q}" placeholder="Search by college or area..." class="search-bar">
-      <input name="min_fee" value="{min_fee}" type="number" placeholder="Min budget (₹)" class="search-bar">
-      <input name="max_fee" value="{max_fee}" type="number" placeholder="Max budget (₹)" class="search-bar">
+    <form method="GET" class="mb-3 grid md:grid-cols-3 gap-3 items-center">
+
+      <!-- Budget filter -->
+      <select name="budget" class="search-bar">
+        <option value="" {sel_any_b}>Any budget</option>
+        <option value="lt1" {sel_lt1}>Below ₹1,00,000</option>
+        <option value="b2_3" {sel_b2_3}>₹2,00,000 – ₹3,00,000</option>
+        <option value="gt3" {sel_gt3}>Above ₹3,00,000</option>
+      </select>
+
+      <!-- Rating filter -->
+      <select name="rating" class="search-bar">
+        <option value="" {sel_r_any}>Any rating</option>
+        <option value="3.5" {sel_r_35}>3.5★ &amp; above</option>
+        <option value="4.0" {sel_r_40}>4.0★ &amp; above</option>
+        <option value="4.5" {sel_r_45}>4.5★ &amp; above</option>
+      </select>
+
       <button class="px-3 py-2 bg-indigo-600 rounded text-sm">Filter</button>
     </form>
 
     <p class="text-[11px] text-slate-400 mt-1">
-      Fees shown are approximate yearly tuition for Hyderabad hotel management programmes. Students should confirm with the college website before applying.
+      Fees are approximate yearly tuition for hotel management / hospitality programmes in Hyderabad.
+      Students should confirm with the college directly before applying.
     </p>
 
     <table class="table mt-2">
-      <tr><th>Name</th><th>Location</th><th>Approx. Annual Fees</th><th>Placements / Notes</th></tr>
+      <tr>
+        <th>College</th>
+        <th>Key Course</th>
+        <th>Location</th>
+        <th>Approx. Annual Fees</th>
+        <th>Rating</th>
+      </tr>
       {rows}
     </table>
     """
     return render_page(content, "Courses & Colleges")
-
 
 # ======================= MENTORSHIP =======================
 @app.route("/mentorship")
@@ -511,7 +583,7 @@ def book_mentor(mentor_id):
     """
     return render_page(content, "Book Mentor")
 
-# ======================= JOBS =======================
+# ======================= JOBS = PLACEMENTS SNAPSHOT =======================
 @app.route("/jobs")
 def jobs():
     conn = sqlite3.connect(DB)
@@ -524,25 +596,26 @@ def jobs():
     for j in data:
         cards += f"""
         <div class="job-card">
-          <h3 class="font-bold text-lg mb-1">{j[1]}</h3>
-          <p class="text-indigo-300 text-sm">{j[2]}</p>
-          <p class="text-gray-400 text-sm">{j[3]}</p>
-          <p class="text-green-300 font-bold text-sm mb-2">{j[4]}</p>
-          <a href="/apply-job/{j[0]}" class="mt-2 inline-block text-xs px-3 py-1 bg-emerald-600 rounded">
-            Apply (demo)
-          </a>
+          <h3 class="font-bold text-sm md:text-base mb-1">{j[1]}</h3>
+          <p class="text-indigo-300 text-xs md:text-sm">Top recruiter: {j[2]}</p>
+          <p class="text-gray-400 text-xs md:text-sm">Location: {j[3]}</p>
+          <p class="text-green-300 font-semibold text-xs md:text-sm mt-1">{j[4]}</p>
         </div>
         """
 
     content = f"""
-    <h2 class="text-3xl font-bold mb-4">Job Opportunities</h2>
-    <p class="text-gray-300 mb-4 text-sm">All job titles and companies are placeholders (demo ...)</p>
+    <h2 class="text-3xl font-bold mb-4">Placements &amp; Recruiters Snapshot</h2>
+    <p class="text-gray-300 mb-4 text-sm">
+      This section shows sample placement outcomes and recruiter names connected to Hyderabad hotel-management colleges.
+      All packages are indicative and for demo only – actual numbers depend on college, year and role.
+    </p>
     <div class="grid md:grid-cols-3 gap-6">
       {cards}
     </div>
     """
-    return render_page(content, "Jobs & Internships")
+    return render_page(content, "Jobs & Placements")
 
+# (Optional: keep apply-job as a demo flow, now more generic)
 @app.route("/apply-job/<int:job_id>", methods=["GET", "POST"])
 def apply_job(job_id):
     conn = sqlite3.connect(DB)
@@ -556,25 +629,27 @@ def apply_job(job_id):
 
     if request.method == "POST":
         content = f"""
-        <h2 class="text-2xl font-bold mb-4">Application Submitted</h2>
+        <h2 class="text-2xl font-bold mb-4">Interest Submitted</h2>
         <p class="text-gray-300 mb-3 text-sm">
-          Your demo application for <span class="text-indigo-300 font-semibold">{job[1]}</span> at {job[2]} has been recorded.
+          Your interest in a placement similar to
+          <span class="text-indigo-300 font-semibold">{job[1]}</span>
+          has been recorded (demo only).
         </p>
-        <a href="/jobs" class="px-4 py-2 bg-indigo-600 rounded text-sm">Back to jobs</a>
+        <a href="/jobs" class="px-4 py-2 bg-indigo-600 rounded text-sm">Back to placements</a>
         """
-        return render_page(content, "Job Application")
+        return render_page(content, "Placement Interest")
 
     content = f"""
-    <h2 class="text-2xl font-bold mb-4">Apply for Job</h2>
+    <h2 class="text-2xl font-bold mb-4">Show Interest in Similar Placement</h2>
     <p class="text-gray-300 mb-4 text-sm">
-      Role: <span class="text-indigo-300 font-semibold">{job[1]}</span> at {job[2]} (details ...).
+      Role example: <span class="text-indigo-300 font-semibold">{job[1]}</span><br>
+      Recruiter: {job[2]} | Location: {job[3]} | Package: {job[4]}
     </p>
     <form method="POST" class="auth-card" enctype="multipart/form-data">
       <input name="name" placeholder="Your name ..." class="input-box">
       <input name="email" placeholder="Your email ..." class="input-box">
       <input name="phone" placeholder="Phone number ..." class="input-box">
-      <input type="file" name="resume" class="input-box">
-      <button class="submit-btn">Submit Application (demo)</button>
+      <button class="submit-btn">Submit (demo)</button>
     </form>
     """
     return render_page(content, "Apply Job")
