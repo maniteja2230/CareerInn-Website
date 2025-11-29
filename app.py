@@ -725,11 +725,19 @@ def jobs():
 # -------------------- AI CAREER BOT --------------------
 @app.route("/chatbot", methods=["GET", "POST"])
 def chatbot():
-    # Simple session-based chat history
-    if "ai_history" not in session:
-        session["ai_history"] = []
+    # ---- normalize old history (tuples) into dicts ----
+    raw_history = session.get("ai_history", [])
+    history = []
 
-    history = session["ai_history"]
+    for m in raw_history:
+        if isinstance(m, dict) and "role" in m and "content" in m:
+            history.append({"role": m["role"], "content": m["content"]})
+        elif isinstance(m, (list, tuple)) and len(m) == 2:
+            role, content = m
+            history.append({"role": str(role), "content": str(content)})
+        # ignore anything else
+
+    session["ai_history"] = history  # save cleaned history
 
     if request.method == "POST":
         user_message = request.form.get("message", "").strip()
@@ -759,6 +767,7 @@ def chatbot():
 
     html = render_template_string(CHATBOT_HTML, history=history)
     return render_page(html, "CareerInn AI Mentor")
+
 
 # -------------------- SUPPORT --------------------
 @app.route("/support")
