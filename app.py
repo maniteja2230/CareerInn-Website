@@ -179,58 +179,55 @@ def home():
           </div>
 
           <p class="hero-footnote">
-            ₹299 per student (demo prototype – ready to plug in real data later).
+            ₹299 per student (demo prototype – real data can be integrated).
           </p>
         </div>
 
-        <!-- RIGHT: SIMPLE CARD -->
+        <!-- RIGHT: STUDENT PASS CARD -->
         <div class="hero-card rounded-3xl p-6 md:p-7 space-y-4">
           <p class="text-xs text-slate-300 uppercase tracking-[0.2em]">
             Student pass
           </p>
+
           <div class="flex items-end gap-2">
             <span class="text-4xl font-extrabold text-emerald-300">₹299</span>
             <span class="text-xs text-slate-300 mb-2">per student / year</span>
           </div>
+
           <p class="text-[12px] text-slate-300">
             Students can explore hospitality careers in one simple space.
           </p>
+
           <ul class="text-[12px] text-slate-200 space-y-1.5 mt-3">
             <li>• College explorer along with courses</li>
             <li>• Mentor connect flow with request form</li>
-            <li>• Job &amp; internship apply form (demo only)</li>
+            <li>• Job &amp; internship apply flow (demo only)</li>
+            <li>⭐ <b>100% Guaranteed Job & Internship Guidance</b></li>
           </ul>
         </div>
       </section>
 
-      <!-- 5 FEATURE CARDS -->
+      <!-- FEATURE MODULES (NOW 7 BOXES) -->
       <section class="space-y-4">
-        <h3 class="text-sm font-semibold text-slate-200">Core spaces inside CareerInn:</h3>
-        <div class="grid md:grid-cols-5 gap-4">
+        <h3 class="text-sm font-semibold text-slate-200">CareerInn Spaces:</h3>
 
-          <a href="/courses" class="feature-card">
-            📘 Courses
-            <p class="sub">Explore demo hospitality courses.</p>
+        <div class="grid md:grid-cols-7 gap-4">
+
+          <a href="/courses" class="feature-card">📘 Courses<p class="sub">Demo course access</p></a>
+          <a href="/courses" class="feature-card">🏫 Colleges<p class="sub">Search & compare</p></a>
+          <a href="/mentorship" class="feature-card">🧑‍🏫 Mentorship<p class="sub">Career guidance</p></a>
+          <a href="/jobs" class="feature-card">💼 Jobs<p class="sub">Job listings</p></a>
+          <a href="/jobs" class="feature-card">📋 Internships<p class="sub">Training roles</p></a>
+
+          <!-- 🔥 Newly Added -->
+          <a href="/global-match" class="feature-card">
+            🌎 Global Match
+            <p class="sub">Worldwide college + internship pairing</p>
           </a>
 
-          <a href="/courses" class="feature-card">
-            🏫 Colleges
-            <p class="sub">Browse demo hotel management colleges.</p>
-          </a>
-
-          <a href="/mentorship" class="feature-card">
-            🧑‍🏫 Mentorship
-            <p class="sub">Connect with mentors (request flow demo).</p>
-          </a>
-
-          <a href="/jobs" class="feature-card">
-            💼 Jobs
-            <p class="sub">See sample job openings.</p>
-          </a>
-
-          <a href="/jobs" class="feature-card">
-            📋 Internships
-            <p class="sub">View internship-style roles.</p>
+          <a href="/support" class="feature-card">
+            🆘 24/7 Support
+            <p class="sub">Anytime student assistance</p>
           </a>
 
         </div>
@@ -238,6 +235,7 @@ def home():
     </div>
     """
     return render_page(content, "CareerInn | Home")
+
 
 # ======================= AUTH (SIGNUP / LOGIN) =======================
 SIGNUP_FORM = """
