@@ -80,6 +80,17 @@ class Job(Base):
     salary = Column(String(255), nullable=False)
 
 
+class AiUsage(Base):
+    """
+    Tracks if a user has already used their free AI chat.
+    One row per user_id.
+    """
+    __tablename__ = "ai_usage"
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, nullable=False, unique=True)
+    ai_used = Column(Integer, nullable=False, default=0)
+
+
 def get_db():
     return SessionLocal()
 
@@ -248,6 +259,7 @@ BASE_HTML = """
           <a href="/courses" class="hover:text-indigo-400">Courses</a>
           <a href="/mentorship" class="hover:text-indigo-400">Mentorship</a>
           <a href="/jobs" class="hover:text-indigo-400">Jobs</a>
+          <a href="/global-match" class="hover:text-indigo-400">Global Match</a>
           <a href="/chatbot" class="hover:text-indigo-400">AI Career Bot</a>
           <a href="/support" class="hover:text-indigo-400">Support</a>
 
@@ -277,15 +289,25 @@ BASE_HTML = """
 """
 
 
-
 def render_page(content_html, title="CareerInn"):
     return render_template_string(BASE_HTML, content=content_html, title=title)
 
 
-# -------------------- HOME (dynamic CTA) --------------------
+# -------------------- HOME (dynamic CTA using DB usage) --------------------
 @app.route("/")
 def home():
-    ai_used = session.get("ai_used", False)
+    # default: AI not used
+    ai_used = False
+
+    # If logged in, read from DB so it works across devices
+    user_id = session.get("user_id")
+    if user_id:
+        db = get_db()
+        usage = db.query(AiUsage).filter_by(user_id=user_id).first()
+        db.close()
+        if usage and usage.ai_used >= 1:
+            ai_used = True
+            session["ai_used"] = True
 
     if not ai_used:
         cta_html = """
@@ -296,7 +318,7 @@ def home():
               🤖 Try free AI career chat
             </a>
           </div>
-          <p class="hero-footnote">First AI chat is free. After that, guidance continues inside the ₹299/year pass.</p>
+          <p class="hero-footnote">First AI chat is free after login. After that, guidance continues inside the ₹299/year pass.</p>
         """
     else:
         cta_html = """
@@ -339,22 +361,22 @@ def home():
           {cta_html}
         </div>
 
-        <!-- RIGHT: STUDENT PASS CARD -->
-        <div class="hero-card rounded-3xl p-6 md:p-7 space-y-4">
-          <p class="text-xs text-slate-300 uppercase tracking-[0.2em]">
+        <!-- RIGHT: BIGGER STUDENT PASS CARD -->
+        <div class="hero-card rounded-3xl p-7 md:p-9 space-y-5">
+          <p class="text-sm text-slate-300 uppercase tracking-[0.22em]">
             Student pass
           </p>
 
-          <div class="flex items-end gap-2">
-            <span class="text-4xl font-extrabold text-emerald-300">₹299</span>
-            <span class="text-xs text-slate-300 mb-2">per student / year</span>
+          <div class="flex items-end gap-3">
+            <span class="text-5xl font-extrabold text-emerald-300">₹299</span>
+            <span class="text-sm text-slate-300 mb-2">per student / year</span>
           </div>
 
-          <p class="text-[12px] text-slate-300">
-            Students can explore hospitality careers in one simple space.
+          <p class="text-[13px] md:text-sm text-slate-300">
+            Students can explore hospitality careers, compare colleges, and get mentor &amp; AI guidance in one simple space.
           </p>
 
-          <ul class="text-[12px] text-slate-200 space-y-1.5 mt-3">
+          <ul class="text-sm text-slate-200 space-y-1.5 mt-3">
             <li>• Hyderabad hotel-management courses &amp; colleges</li>
             <li>• Mentor connect flow with request form</li>
             <li>• Job &amp; internship placements snapshot</li>
@@ -368,7 +390,7 @@ def home():
       <section class="space-y-4">
         <h3 class="text-sm font-semibold text-slate-200">CareerInn Spaces:</h3>
 
-        <div class="grid md:grid-cols-5 gap-4">
+        <div class="grid gap-4 md:grid-cols-3 lg:grid-cols-6">
           <a href="/courses" class="feature-card">
             📘 Courses
             <p class="sub">See key hospitality courses.</p>
@@ -387,6 +409,11 @@ def home():
           <a href="/jobs" class="feature-card">
             💼 Jobs &amp; Placements
             <p class="sub">Avg packages &amp; recruiters snapshot.</p>
+          </a>
+
+          <a href="/global-match" class="feature-card">
+            🌍 Global Match
+            <p class="sub">Abroad colleges &amp; internships overview.</p>
           </a>
 
           <a href="/chatbot" class="feature-card">
@@ -409,16 +436,25 @@ CHATBOT_HTML = """
     hospitality / hotel management paths and colleges in Hyderabad. At the end it will
     ask you to connect with a human mentor for final decisions.
   </p>
-  <!-- Reset button for new student -->
+
+  <!-- Reset button for new student (only if not locked) -->
+  {% if not locked %}
   <form method="GET" action="/chatbot" class="mb-3">
     <input type="hidden" name="reset" value="1">
     <button class="px-3 py-1 rounded-full border border-slate-600 text-[11px] hover:bg-slate-800">
       🔄 Start new student chat
     </button>
   </form>
+  {% endif %}
 
   <div class="bg-slate-900/80 border border-slate-700 rounded-2xl p-4 h-[420px] overflow-y-auto mb-4">
-    {% if history %}
+    {% if locked %}
+      <p class="text-sm text-amber-300">
+        You have already used your <b>one free AI career chat</b> on CareerInn with this account.
+        To continue getting personalised AI + mentor guidance, please purchase the
+        <b>₹299/year Student Pass</b> from the home page.
+      </p>
+    {% elif history %}
       {% for m in history %}
         <div class="mb-3">
           {% if m.role == 'user' %}
@@ -442,6 +478,7 @@ CHATBOT_HTML = """
     {% endif %}
   </div>
 
+  {% if not locked %}
   <form method="POST" class="flex gap-2">
     <input
       name="message"
@@ -454,6 +491,11 @@ CHATBOT_HTML = """
       Send
     </button>
   </form>
+  {% else %}
+  <p class="text-xs text-slate-400">
+    Tip: Go back to the home page to see the Student Pass details and connect with mentors.
+  </p>
+  {% endif %}
 </div>
 """
 
@@ -516,19 +558,28 @@ def login():
 
         db = get_db()
         user = db.query(User).filter_by(email=email, password=password).first()
-        db.close()
 
         if user:
+            # track in session
             session["user"] = user.name
-            # reset AI state for this logged-in user
+            session["user_id"] = user.id
+
+            # read AI usage for this user
+            usage = db.query(AiUsage).filter_by(user_id=user.id).first()
+            session["ai_used"] = bool(usage and usage.ai_used >= 1)
+
+            db.close()
+
+            # reset in-session chat history
             session["ai_history"] = []
-            session["ai_used"] = False
+
             return redirect("/")  # go to HOME after login
-        else:
-            return render_page(
-                "<p class='text-red-400 text-sm mb-3'>Invalid email or password.</p>" + LOGIN_FORM,
-                "Login"
-            )
+
+        db.close()
+        return render_page(
+            "<p class='text-red-400 text-sm mb-3'>Invalid email or password.</p>" + LOGIN_FORM,
+            "Login"
+        )
 
     return render_page(LOGIN_FORM, "Login")
 
@@ -751,63 +802,151 @@ def jobs():
     return render_page(content, "Jobs & Placements")
 
 
-# -------------------- AI CAREER BOT --------------------
+# -------------------- GLOBAL COLLEGE & INTERNSHIP MATCH --------------------
+@app.route("/global-match")
+def global_match():
+    content = """
+    <h2 class="text-3xl font-bold mb-4">Global College &amp; Internship Match</h2>
+    <p class="text-gray-300 mb-4 text-sm">
+      Many hospitality students from Hyderabad explore <b>abroad options</b> after their base degree or diploma.
+      This section gives a broad idea of where students usually go and what kind of internships they target.
+      These are <b>examples only</b> – always confirm directly with each college or agency.
+    </p>
+
+    <div class="grid md:grid-cols-3 gap-5 mb-6">
+      <div class="support-box">
+        <h3 class="font-semibold mb-2 text-lg">Popular Countries</h3>
+        <ul class="text-sm text-slate-200 space-y-1.5">
+          <li>• Switzerland – hotel schools + paid internships</li>
+          <li>• Dubai / UAE – luxury hotels, F&amp;B internships</li>
+          <li>• Singapore – structured hospitality diplomas</li>
+          <li>• Canada – 2-year hospitality diplomas + work route</li>
+        </ul>
+      </div>
+
+      <div class="support-box">
+        <h3 class="font-semibold mb-2 text-lg">Typical Requirements</h3>
+        <ul class="text-sm text-slate-200 space-y-1.5">
+          <li>• Strong 10th &amp; 12th marks (especially English)</li>
+          <li>• IELTS / language test for many programmes</li>
+          <li>• Clear SOP explaining your hospitality goals</li>
+          <li>• Budget planning for fees + living expenses</li>
+        </ul>
+      </div>
+
+      <div class="support-box">
+        <h3 class="font-semibold mb-2 text-lg">Internship Patterns</h3>
+        <ul class="text-sm text-slate-200 space-y-1.5">
+          <li>• 6–12 month internships in hotels / resorts</li>
+          <li>• Roles in front office, F&amp;B, culinary, housekeeping</li>
+          <li>• Mix of stipend + accommodation in many cases</li>
+          <li>• Often used as a pathway to full-time roles</li>
+        </ul>
+      </div>
+    </div>
+
+    <p class="text-xs text-slate-400 mb-4">
+      Data above is a generic pattern seen in hospitality education. Exact fees, visa rules and internship
+      structures change every year and depend on each college, hotel group and country.
+    </p>
+
+    <p class="text-sm text-slate-200">
+      To match you with a realistic abroad pathway based on your <b>marks, budget and country preference</b>,
+      first talk to the <b>AI Career Bot</b>, then share that summary with a <b>CareerInn mentor</b> from the
+      Mentorship section.
+    </p>
+    """
+    return render_page(content, "Global College & Internship Match")
+
+
+# -------------------- AI CAREER BOT (ONE FREE CHAT / USER) --------------------
 @app.route("/chatbot", methods=["GET", "POST"])
 def chatbot():
-    # if reset requested (new student), clear history
+    # Require login for AI chat
+    user_id = session.get("user_id")
+    if not user_id:
+        # Not logged in, send to login page
+        return redirect("/login")
+
+    # If reset requested (new student), clear history in-session only
     if request.args.get("reset") == "1":
         session["ai_history"] = []
-        # do NOT reset ai_used here; we still want home to know AI was used once
         return redirect("/chatbot")
 
     # ---- normalize old history (tuples) into dicts ----
     raw_history = session.get("ai_history", [])
     history = []
-
     for m in raw_history:
         if isinstance(m, dict) and "role" in m and "content" in m:
             history.append({"role": m["role"], "content": m["content"]})
         elif isinstance(m, (list, tuple)) and len(m) == 2:
             role, content = m
             history.append({"role": str(role), "content": str(content)})
-        # ignore anything else
-
     session["ai_history"] = history  # save cleaned history
+
+    # ---- read / create usage row ----
+    db = get_db()
+    usage = db.query(AiUsage).filter_by(user_id=user_id).first()
+    locked = bool(usage and usage.ai_used >= 1)
 
     if request.method == "POST":
         user_message = request.form.get("message", "").strip()
         if user_message:
-            history.append({"role": "user", "content": user_message})
-
-            messages = [{"role": "system", "content": AI_SYSTEM_PROMPT}]
-            for m in history:
-                messages.append({"role": m["role"], "content": m["content"]})
-
-            groq_client = get_groq_client()
-            if groq_client is None:
-                bot_reply = (
-                    "AI is not configured yet. Please ask the admin to set GROQ_API_KEY "
-                    "in the server environment."
-                )
+            if locked:
+                # Already used free chat – do NOT call AI again
+                history.append({
+                    "role": "assistant",
+                    "content": (
+                        "You have already used your one free AI career chat. "
+                        "Please purchase the ₹299/year Student Pass on the home page "
+                        "to continue getting personalised AI and mentor guidance."
+                    ),
+                })
             else:
-                try:
-                    response = groq_client.chat.completions.create(
-                        model="llama-3.1-8b-instant",
-                        messages=messages,
-                        temperature=0.6,
-                    )
-                    bot_reply = response.choices[0].message.content
-                except Exception as e:
+                # First time free chat
+                history.append({"role": "user", "content": user_message})
+
+                messages = [{"role": "system", "content": AI_SYSTEM_PROMPT}]
+                for m in history:
+                    messages.append({"role": m["role"], "content": m["content"]})
+
+                groq_client = get_groq_client()
+                if groq_client is None:
                     bot_reply = (
-                        "Sorry, I couldn't reach the AI service right now. "
-                        f"Technical info: {e}"
+                        "AI is not configured yet. Please ask the admin to set GROQ_API_KEY "
+                        "in the server environment."
                     )
+                else:
+                    try:
+                        response = groq_client.chat.completions.create(
+                            model="llama-3.1-8b-instant",
+                            messages=messages,
+                            temperature=0.6,
+                        )
+                        bot_reply = response.choices[0].message.content
+                    except Exception as e:
+                        bot_reply = (
+                            "Sorry, I couldn't reach the AI service right now. "
+                            f"Technical info: {e}"
+                        )
 
-            history.append({"role": "assistant", "content": bot_reply})
+                history.append({"role": "assistant", "content": bot_reply})
+
+                # Mark this user's free chat as used
+                if usage is None:
+                    usage = AiUsage(user_id=user_id, ai_used=1)
+                    db.add(usage)
+                else:
+                    usage.ai_used = 1
+                db.commit()
+                locked = True
+                session["ai_used"] = True
+
             session["ai_history"] = history
-            session["ai_used"] = True  # mark that AI has been used once
 
-    html = render_template_string(CHATBOT_HTML, history=history)
+    db.close()
+
+    html = render_template_string(CHATBOT_HTML, history=history, locked=locked)
     return render_page(html, "CareerInn AI Mentor")
 
 
