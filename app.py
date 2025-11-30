@@ -1,4 +1,6 @@
 import os
+from werkzeug.security import generate_password_hash, check_password_hash
+
 from flask import (
     Flask,
     request,
@@ -541,34 +543,39 @@ LOGIN_FORM = """
 @app.route("/signup", methods=["GET", "POST"])
 def signup():
     if request.method == "POST":
-        name = (request.form.get("name") or "").strip()
-        email = (request.form.get("email") or "").strip().lower()
-        password = (request.form.get("password") or "").strip()
+        name = request.form.get("name", "").strip()
+        email = request.form.get("email", "").strip().lower()
+        password = request.form.get("password", "").strip()
 
         if not name or not email or not password:
             return render_page(
-                "<p class='text-red-400 text-sm mb-3'>All fields are required.</p>"
-                + SIGNUP_FORM,
+                "<p class='text-red-400 text-sm mb-3'>All fields are required.</p>" + SIGNUP_FORM,
                 "Signup"
             )
 
         db = get_db()
-        try:
-            # check if email already exists
-            existing = db.query(User).filter_by(email=email).first()
-            if existing:
-                db.close()
-                return render_page(
-                    "<p class='text-red-400 text-sm mb-3'>This email is already registered. Please login instead.</p>"
-                    + SIGNUP_FORM,
-                    "Signup"
-                )
 
-            user = User(name=name, email=email, password=password)
-            db.add(user)
-            db.commit()
-        finally:
+        # ✅ block duplicate emails
+        existing = db.query(User).filter(User.email == email).first()
+        if existing:
             db.close()
+            return render_page(
+                "<p class='text-red-400 text-sm mb-3'>An account with this email already exists. Please login.</p>"
+                + SIGNUP_FORM,
+                "Signup"
+            )
+
+        # ✅ store hashed password, NOT plain text
+        hashed_password = generate_password_hash(
+            password,
+            method="pbkdf2:sha256",
+            salt_length=16
+        )
+
+        user = User(name=name, email=email, password=hashed_password)
+        db.add(user)
+        db.commit()
+        db.close()
 
         return redirect("/login")
 
@@ -579,40 +586,33 @@ def signup():
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
-        email = (request.form.get("email") or "").strip().lower()
-        password = (request.form.get("password") or "").strip()
+        email = request.form.get("email", "").strip().lower()
+        password = request.form.get("password", "").strip()
 
         db = get_db()
-        try:
-            user = db.query(User).filter_by(email=email).first()
-        finally:
-            db.close()
+        # 👉 only look up by email
+        user = db.query(User).filter(User.email == email).first()
+        db.close()
 
-        # 1) email not found
-        if not user:
-            return render_page(
-                "<p class='text-red-400 text-sm mb-3'>No account found with this email. Please signup first.</p>"
-                + LOGIN_FORM,
-                "Login"
-            )
+        # ✅ check hashed password
+        if user and check_password_hash(user.password, password):
+            session["user"] = user.name
+            session["user_id"] = user.id
 
-        # 2) wrong password
-        if user.password != password:
-            return render_page(
-                "<p class='text-red-400 text-sm mb-3'>Incorrect password. Please try again.</p>"
-                + LOGIN_FORM,
-                "Login"
-            )
+            # reset AI state for this user
+            session["ai_history"] = []
+            session["ai_used"] = False
 
-        # 3) success
-        session["user_id"] = user.id      # used by chatbot
-        session["user"] = user.name       # used for navbar greeting
-        session["ai_history"] = []        # clear chat history for this login
-        # IMPORTANT: do NOT reset per-user free-chat counter here
+            return redirect("/")  # go to HOME after login
 
-        return redirect("/")
+        # login failed
+        return render_page(
+            "<p class='text-red-400 text-sm mb-3'>Invalid email or password.</p>" + LOGIN_FORM,
+            "Login"
+        )
 
     return render_page(LOGIN_FORM, "Login")
+
 
 
 
