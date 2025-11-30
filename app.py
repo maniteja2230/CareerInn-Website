@@ -97,12 +97,7 @@ class AiUsage(Base):
 
 class UserProfile(Base):
     """
-    Simple user dashboard profile:
-    - skills_text: what they know
-    - target_roles: what they want
-    - self_rating: 0–5 rating
-    - resume_link: Drive / resume URL
-    - notes: extra notes
+    Simple user dashboard profile
     """
     __tablename__ = "user_profiles"
     id = Column(Integer, primary_key=True)
@@ -280,6 +275,7 @@ BASE_HTML = """
       <div class="hidden md:flex items-center gap-6 text-sm">
           <a href="/" class="hover:text-indigo-400">Home</a>
           <a href="/courses" class="hover:text-indigo-400">Courses</a>
+          <a href="/colleges" class="hover:text-indigo-400">Colleges</a>
           <a href="/mentorship" class="hover:text-indigo-400">Mentorship</a>
           <a href="/jobs" class="hover:text-indigo-400">Jobs</a>
           <a href="/global-match" class="hover:text-indigo-400">Global Match</a>
@@ -321,9 +317,10 @@ def render_page(content_html, title="CareerInn"):
 def home():
     # default: AI not used
     ai_used = False
+    user_id = session.get("user_id")
+    logged_in = bool(user_id)
 
     # If logged in, read from DB so it works across devices
-    user_id = session.get("user_id")
     if user_id:
         db = get_db()
         usage = db.query(AiUsage).filter_by(user_id=user_id).first()
@@ -333,17 +330,36 @@ def home():
             session["ai_used"] = True
 
     if not ai_used:
-        cta_html = """
-          <div class="flex flex-wrap items-center gap-3 mt-3">
-            <a href="/signup" class="primary-cta">Create free account</a>
-            <a href="/login" class="ghost-cta">Sign in</a>
-            <a href="/chatbot" class="px-4 py-2 rounded-full border border-emerald-400/70 text-xs md:text-sm hover:bg-emerald-500/10">
-              🤖 Try free AI career chat
-            </a>
-          </div>
-          <p class="hero-footnote">First AI chat is free after login. After that, guidance continues inside the ₹299/year pass.</p>
-        """
+        # FIRST FREE CHAT STAGE
+        if logged_in:
+            # logged-in user → show Get started instead of Create free account
+            cta_html = """
+              <div class="flex flex-wrap items-center gap-3 mt-3">
+                <a href="/dashboard" class="primary-cta">
+                  🚀 Get started – ₹299 / year
+                </a>
+                <a href="/chatbot" class="px-4 py-2 rounded-full border border-emerald-400/70 text-xs md:text-sm hover:bg-emerald-500/10">
+                  🤖 Use your free AI career chat
+                </a>
+              </div>
+              <p class="hero-footnote">
+                You are logged in. You still have one free AI chat. After that, guidance continues inside the ₹299/year pass.
+              </p>
+            """
+        else:
+            # not logged in
+            cta_html = """
+              <div class="flex flex-wrap items-center gap-3 mt-3">
+                <a href="/signup" class="primary-cta">Create free account</a>
+                <a href="/login" class="ghost-cta">Sign in</a>
+                <a href="/chatbot" class="px-4 py-2 rounded-full border border-emerald-400/70 text-xs md:text-sm hover:bg-emerald-500/10">
+                  🤖 Try free AI career chat
+                </a>
+              </div>
+              <p class="hero-footnote">First AI chat is free after login. After that, guidance continues inside the ₹299/year pass.</p>
+            """
     else:
+        # FREE CHAT USED → ALWAYS SHOW PAID CTA
         cta_html = """
           <div class="flex flex-wrap items-center gap-4 mt-3">
             <a href="/signup" class="primary-cta">
@@ -419,7 +435,7 @@ def home():
             <p class="sub">See key hospitality courses.</p>
           </a>
 
-          <a href="/courses" class="feature-card">
+          <a href="/colleges" class="feature-card">
             🏫 Colleges
             <p class="sub">Hyderabad hotel-management colleges.</p>
           </a>
@@ -978,6 +994,7 @@ def dashboard():
 @app.route("/courses")
 def courses():
     db = get_db()
+    # just use college+course list, simple view
     data = db.query(College).order_by(College.name.asc()).all()
     db.close()
 
@@ -1009,6 +1026,106 @@ def courses():
     </table>
     """
     return render_page(content, "Courses")
+
+
+# -------------------- COLLEGES – WITH FILTERS (budget + rating) --------------------
+@app.route("/colleges")
+def colleges():
+    budget = request.args.get("budget", "").strip()
+    rating_min = request.args.get("rating", "").strip()
+
+    db = get_db()
+    query = db.query(College)
+
+    # Budget filters
+    if budget == "lt1":
+        query = query.filter(College.fees < 100000)
+    elif budget == "b1_2":
+        query = query.filter(College.fees.between(100000, 200000))
+    elif budget == "b2_3":
+        query = query.filter(College.fees.between(200000, 300000))
+    elif budget == "gt3":
+        query = query.filter(College.fees > 300000)
+
+    # Rating filter
+    if rating_min:
+        try:
+            rating_val = float(rating_min)
+            query = query.filter(College.rating >= rating_val)
+        except ValueError:
+            pass
+
+    data = query.order_by(College.rating.desc()).all()
+    db.close()
+
+    rows = ""
+    for col in data:
+        rows += f"""
+        <tr>
+          <td>{col.name}</td>
+          <td>{col.course}</td>
+          <td>{col.location}</td>
+          <td>₹{col.fees:,}</td>
+          <td>{col.rating:.1f}★</td>
+        </tr>
+        """
+
+    if not rows:
+        rows = "<tr><td colspan='5'>No colleges match this budget / rating yet.</td></tr>"
+
+    sel_any_b = "selected" if budget == "" else ""
+    sel_lt1   = "selected" if budget == "lt1" else ""
+    sel_b1_2  = "selected" if budget == "b1_2" else ""
+    sel_b2_3  = "selected" if budget == "b2_3" else ""
+    sel_gt3   = "selected" if budget == "gt3" else ""
+
+    sel_r_any = "selected" if rating_min == "" else ""
+    sel_r_35  = "selected" if rating_min == "3.5" else ""
+    sel_r_40  = "selected" if rating_min == "4.0" else ""
+    sel_r_45  = "selected" if rating_min == "4.5" else ""
+
+    content = f"""
+    <h2 class="text-3xl font-bold mb-4">Hyderabad Hotel Management – Colleges</h2>
+
+    <form method="GET" class="mb-3 grid md:grid-cols-3 gap-3 items-center">
+
+      <!-- Budget filter -->
+      <select name="budget" class="search-bar">
+        <option value="" {sel_any_b}>Any budget</option>
+        <option value="lt1" {sel_lt1}>Below ₹1,00,000</option>
+        <option value="b1_2" {sel_b1_2}>₹1,00,000 – ₹2,00,000</option>
+        <option value="b2_3" {sel_b2_3}>₹2,00,000 – ₹3,00,000</option>
+        <option value="gt3" {sel_gt3}>Above ₹3,00,000</option>
+      </select>
+
+      <!-- Rating filter -->
+      <select name="rating" class="search-bar">
+        <option value="" {sel_r_any}>Any rating</option>
+        <option value="3.5" {sel_r_35}>3.5★ &amp; above</option>
+        <option value="4.0" {sel_r_40}>4.0★ &amp; above</option>
+        <option value="4.5" {sel_r_45}>4.5★ &amp; above</option>
+      </select>
+
+      <button class="px-3 py-2 bg-indigo-600 rounded text-sm">Filter</button>
+    </form>
+
+    <p class="text-[11px] text-slate-400 mt-1">
+      Fees are approximate yearly tuition for hotel management / hospitality programmes in Hyderabad.
+      Always confirm with the college before applying.
+    </p>
+
+    <table class="table mt-2">
+      <tr>
+        <th>College</th>
+        <th>Key Course</th>
+        <th>Location</th>
+        <th>Approx. Annual Fees</th>
+        <th>Rating</th>
+      </tr>
+      {rows}
+    </table>
+    """
+    return render_page(content, "Colleges")
 
 
 # -------------------- MENTORSHIP --------------------
