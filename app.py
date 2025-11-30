@@ -433,30 +433,31 @@ def home():
 CHATBOT_HTML = """
 <div class="max-w-3xl mx-auto space-y-6">
   <h1 class="text-3xl font-bold mb-2">CareerInn AI Mentor</h1>
-  <p class="text-sm text-slate-300 mb-4">
-    This AI bot asks about your marks, interests, budget and goals, then suggests
-    hospitality / hotel management paths and colleges in Hyderabad. At the end it will
-    ask you to connect with a human mentor for final decisions.
-  </p>
 
-  <!-- Reset button for new student (only if not locked) -->
   {% if not locked %}
+    <p class="text-sm text-slate-300 mb-4">
+      This AI bot will ask about your marks, budget, interests and city preference,
+      suggest a hospitality path &amp; colleges in Hyderabad, and finally ask you
+      to connect with a human mentor. You get <b>one free full chat session.</b>
+    </p>
+  {% else %}
+    <p class="text-sm text-slate-300 mb-4">
+      Your <b>free AI career chat is finished</b> for this account.
+      Please purchase the ₹299/year Student Pass and connect with a mentor
+      for more guidance.
+    </p>
+  {% endif %}
+
+  <!-- Reset view (only resets messages on screen, not the free lock) -->
   <form method="GET" action="/chatbot" class="mb-3">
     <input type="hidden" name="reset" value="1">
     <button class="px-3 py-1 rounded-full border border-slate-600 text-[11px] hover:bg-slate-800">
-      🔄 Start new student chat
+      🔄 Clear chat on screen
     </button>
   </form>
-  {% endif %}
 
   <div class="bg-slate-900/80 border border-slate-700 rounded-2xl p-4 h-[420px] overflow-y-auto mb-4">
-    {% if locked %}
-      <p class="text-sm text-amber-300">
-        You have already used your <b>one free AI career chat</b> on CareerInn with this account.
-        To continue getting personalised AI + mentor guidance, please purchase the
-        <b>₹299/year Student Pass</b> from the home page.
-      </p>
-    {% elif history %}
+    {% if history %}
       {% for m in history %}
         <div class="mb-3">
           {% if m.role == 'user' %}
@@ -475,42 +476,38 @@ CHATBOT_HTML = """
     {% else %}
       <p class="text-sm text-slate-400">
         👋 Hi! I’m CareerInn AI. Tell me your name and your latest class (10th / 12th / degree),
-        and approximate marks. I’ll ask a few quick questions and suggest a path+college for you.
+        and approximate marks. I’ll ask a few quick questions and suggest a path + college for you.
       </p>
     {% endif %}
   </div>
 
- {% if not locked %}
-<form method="POST" class="flex gap-2">
-  <input
-    name="message"
-    autocomplete="off"
-    placeholder="Type your message here..."
-    class="flex-1 input-box"
-    required
-  >
-  <button class="px-4 py-2 rounded-full bg-indigo-600 hover:bg-indigo-500 text-sm font-semibold">
-    Send
-  </button>
-</form>
+  {% if not locked %}
+    <!-- Chat input when free session is active -->
+    <form method="POST" class="flex gap-2">
+      <input
+        name="message"
+        autocomplete="off"
+        placeholder="Type your message here..."
+        class="flex-1 input-box"
+        required
+      >
+      <button class="px-4 py-2 rounded-full bg-indigo-600 hover:bg-indigo-500 text-sm font-semibold">
+        Send
+      </button>
+    </form>
 
-<!-- 🔥 Button that officially ends the free session -->
-<form method="POST" action="/finish" class="mt-3">
-  <button class="px-4 py-2 bg-rose-500 hover:bg-rose-600 rounded-full text-sm font-bold">
-    🔒 End Session & Lock Free Chat
-  </button>
-</form>
-
-{% else %}
-<div class="mt-4 p-3 bg-slate-800 rounded-xl text-sm text-slate-200">
-  Your free career guidance session has ended.  
-  To continue receiving personalised AI and mentor support,
-  please purchase the <b>₹299/year CareerInn Student Pass.</b><br><br>
-  👉 Visit <a href="/" class="text-indigo-400 underline">Home Page</a> for subscription options.<br>
-  👉 You can still browse colleges, courses & jobs.
-</div>
-{% endif %}
-
+    <!-- End & lock button (POST) -->
+    <form method="POST" action="/chatbot/end" class="mt-3">
+      <button class="px-3 py-1.5 text-[11px] rounded-full border border-rose-500/70 text-rose-200 hover:bg-rose-500/10">
+        🔒 End &amp; lock free AI chat
+      </button>
+    </form>
+  {% else %}
+    <!-- After lock -->
+    <p class="text-xs text-slate-400 mt-2">
+      Tip: Go back to the Home page to see the Student Pass and connect with mentors.
+    </p>
+  {% endif %}
 </div>
 """
 
@@ -972,6 +969,34 @@ def finish():
     db.close()
 
     return redirect("/chatbot")
+
+# -------------------- END & LOCK CHAT (POST) --------------------
+@app.route("/chatbot/end", methods=["POST"])
+def end_chatbot():
+    # must be logged in
+    user_id = session.get("user_id")
+    if not user_id:
+        return redirect("/login")
+
+    db = get_db()
+    try:
+        usage = db.query(AiUsage).filter_by(user_id=user_id).first()
+        if usage is None:
+            usage = AiUsage(user_id=user_id, ai_used=1)
+            db.add(usage)
+        else:
+            usage.ai_used = 1
+        db.commit()
+    finally:
+        db.close()
+
+    # clear this session’s chat + mark as used
+    session["ai_history"] = []
+    session["ai_used"] = True
+
+    # back to chatbot, now in locked state
+    return redirect("/chatbot")
+
 
 # -------------------- SUPPORT --------------------
 @app.route("/support")
