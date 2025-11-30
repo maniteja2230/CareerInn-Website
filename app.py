@@ -640,7 +640,7 @@ def logout():
     return redirect("/")
 
 
-# -------------------- USER DASHBOARD (PROFILE) --------------------
+# -------------------- USER DASHBOARD (PROFILE) WITH VERTICAL MENU --------------------
 @app.route("/dashboard", methods=["GET", "POST"])
 def dashboard():
     if "user_id" not in session:
@@ -649,7 +649,6 @@ def dashboard():
     user_id = session["user_id"]
     user_name = session["user"]
 
-    # which tab?
     tab = request.args.get("tab")
     if request.method == "POST":
         tab = request.form.get("tab", tab)
@@ -698,15 +697,7 @@ def dashboard():
     notes = profile.notes or ""
     db.close()
 
-    base_tab_cls = "px-4 py-2 rounded-full text-xs md:text-sm border border-slate-700 hover:bg-slate-800"
-    def cls(name):
-        return (
-            base_tab_cls + " bg-indigo-600 text-white border-indigo-500"
-            if tab == name
-            else base_tab_cls + " text-slate-300"
-        )
-
-    # panels
+    # ----- PANELS -----
     home_panel = f"""
       <div class="space-y-4">
         <h2 class="text-2xl md:text-3xl font-bold">Welcome back, {user_name} 👋</h2>
@@ -737,8 +728,8 @@ def dashboard():
         <div class="mt-6 bg-slate-900/70 border border-slate-700 rounded-2xl p-4">
           <h3 class="font-semibold mb-2">Quick tips</h3>
           <ul class="text-xs md:text-sm text-slate-300 space-y-1.5">
-            <li>• Use the <b>Skills</b> tab to list your current skills and areas to improve.</li>
-            <li>• Paste your <b>Google Drive / PDF resume link</b> inside the <b>Resume</b> tab.</li>
+            <li>• Use the <b>Skills</b> section to list your current skills and areas to improve.</li>
+            <li>• Paste your <b>Google Drive / PDF resume link</b> inside the <b>Resume</b> section.</li>
             <li>• Chat with the <b>AI Career Bot</b> once, then talk to mentors for final guidance.</li>
           </ul>
         </div>
@@ -765,7 +756,7 @@ def dashboard():
           <div class="support-box">
             <h3 class="font-semibold mb-2">Next step</h3>
             <p class="text-xs md:text-sm text-slate-200 mb-2">
-              Once your Skills and Resume tabs look ready, book a demo mentor slot from the Mentorship page.
+              Once your Skills and Resume sections look ready, book a demo mentor slot from the Mentorship page.
             </p>
             <a href="/mentorship" class="inline-block mt-2 px-4 py-2 rounded-full bg-indigo-600 hover:bg-indigo-500 text-xs font-semibold">
               View mentors
@@ -941,58 +932,53 @@ def dashboard():
     else:
         panel_html = about_panel
 
+    base_tab_cls = "block w-full text-left px-3 py-2 rounded-lg text-xs md:text-sm"
+    def cls(name):
+        return (
+            base_tab_cls + " bg-indigo-600 text-white border border-indigo-500"
+            if tab == name
+            else base_tab_cls + " text-slate-300 hover:bg-slate-800 border border-transparent"
+        )
+
     content = f"""
-    <div class="max-w-6xl mx-auto space-y-6">
-      <div class="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <p class="text-xs text-slate-400">Profile · Hotel &amp; Hospitality</p>
-          <h1 class="text-2xl md:text-3xl font-bold">Student Dashboard</h1>
-        </div>
+    <div class="max-w-6xl mx-auto">
+      <div class="mb-4">
+        <p class="text-xs text-slate-400">Profile · Hotel &amp; Hospitality</p>
+        <h1 class="text-2xl md:text-3xl font-bold">Student Dashboard</h1>
       </div>
 
-      <!-- DASHBOARD TABS -->
-      <div class="flex flex-wrap gap-2 mt-2">
-        <a href="/dashboard?tab=home" class="{cls('home')}">Home</a>
-        <a href="/dashboard?tab=mentors" class="{cls('mentors')}">Mentors</a>
-        <a href="/dashboard?tab=skills" class="{cls('skills')}">Skills</a>
-        <a href="/dashboard?tab=rating" class="{cls('rating')}">Rating</a>
-        <a href="/dashboard?tab=resume" class="{cls('resume')}">Resume</a>
-        <a href="/dashboard?tab=faqs" class="{cls('faqs')}">FAQs</a>
-        <a href="/dashboard?tab=about" class="{cls('about')}">About us</a>
-      </div>
+      <div class="grid md:grid-cols-[220px,1fr] gap-6">
+        <!-- VERTICAL MENU -->
+        <aside class="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 h-max">
+          <p class="text-[11px] text-slate-400 mb-2">Your space</p>
+          <p class="text-sm font-semibold mb-4 truncate">{user_name}</p>
 
-      <div class="mt-4 bg-slate-900/70 border border-slate-800 rounded-2xl p-5 md:p-6">
-        {panel_html}
+          <nav class="flex flex-col gap-2">
+            <a href="/dashboard?tab=home" class="{cls('home')}">🏠 Home</a>
+            <a href="/dashboard?tab=mentors" class="{cls('mentors')}">🧑‍🏫 Mentors</a>
+            <a href="/dashboard?tab=skills" class="{cls('skills')}">⭐ Skills</a>
+            <a href="/dashboard?tab=rating" class="{cls('rating')}">📊 Rating</a>
+            <a href="/dashboard?tab=resume" class="{cls('resume')}">📄 Resume</a>
+            <a href="/dashboard?tab=faqs" class="{cls('faqs')}">❓ FAQs</a>
+            <a href="/dashboard?tab=about" class="{cls('about')}">ℹ️ About us</a>
+          </nav>
+        </aside>
+
+        <!-- MAIN PANEL -->
+        <section class="bg-slate-900/70 border border-slate-800 rounded-2xl p-5 md:p-6">
+          {panel_html}
+        </section>
       </div>
     </div>
     """
     return render_page(content, "Dashboard")
 
 
-# -------------------- COURSES (budget + rating filters) --------------------
+# -------------------- COURSES – ONLY COURSES LIST --------------------
 @app.route("/courses")
 def courses():
-    budget = request.args.get("budget", "").strip()
-    rating_min = request.args.get("rating", "").strip()
-
     db = get_db()
-    query = db.query(College)
-
-    if budget == "lt1":
-        query = query.filter(College.fees < 100000)
-    elif budget == "b2_3":
-        query = query.filter(College.fees.between(200000, 300000))
-    elif budget == "gt3":
-        query = query.filter(College.fees > 300000)
-
-    if rating_min:
-        try:
-            rating_val = float(rating_min)
-            query = query.filter(College.rating >= rating_val)
-        except ValueError:
-            pass
-
-    data = query.order_by(College.rating.desc()).all()
+    data = db.query(College).order_by(College.name.asc()).all()
     db.close()
 
     rows = ""
@@ -1001,66 +987,28 @@ def courses():
         <tr>
           <td>{col.name}</td>
           <td>{col.course}</td>
-          <td>{col.location}</td>
-          <td>₹{col.fees:,}</td>
-          <td>{col.rating:.1f}★</td>
         </tr>
         """
 
     if not rows:
-        rows = "<tr><td colspan='5'>No colleges match this budget / rating yet.</td></tr>"
-
-    sel_lt1   = "selected" if budget == "lt1" else ""
-    sel_b2_3  = "selected" if budget == "b2_3" else ""
-    sel_gt3   = "selected" if budget == "gt3" else ""
-    sel_any_b = "selected" if budget == "" else ""
-
-    sel_r_any = "selected" if rating_min == "" else ""
-    sel_r_35  = "selected" if rating_min == "3.5" else ""
-    sel_r_40  = "selected" if rating_min == "4.0" else ""
-    sel_r_45  = "selected" if rating_min == "4.5" else ""
+        rows = "<tr><td colspan='2'>No courses found yet.</td></tr>"
 
     content = f"""
-    <h2 class="text-3xl font-bold mb-4">Hyderabad Hotel Management – Courses &amp; Colleges</h2>
-
-    <form method="GET" class="mb-3 grid md:grid-cols-3 gap-3 items-center">
-
-      <!-- Budget filter -->
-      <select name="budget" class="search-bar">
-        <option value="" {sel_any_b}>Any budget</option>
-        <option value="lt1" {sel_lt1}>Below ₹1,00,000</option>
-        <option value="b2_3" {sel_b2_3}>₹2,00,000 – ₹3,00,000</option>
-        <option value="gt3" {sel_gt3}>Above ₹3,00,000</option>
-      </select>
-
-      <!-- Rating filter -->
-      <select name="rating" class="search-bar">
-        <option value="" {sel_r_any}>Any rating</option>
-        <option value="3.5" {sel_r_35}>3.5★ &amp; above</option>
-        <option value="4.0" {sel_r_40}>4.0★ &amp; above</option>
-        <option value="4.5" {sel_r_45}>4.5★ &amp; above</option>
-      </select>
-
-      <button class="px-3 py-2 bg-indigo-600 rounded text-sm">Filter</button>
-    </form>
-
-    <p class="text-[11px] text-slate-400 mt-1">
-      Fees are approximate yearly tuition for hotel management / hospitality programmes in Hyderabad.
-      Students should confirm with the college directly before applying.
+    <h2 class="text-3xl font-bold mb-4">Hospitality &amp; Hotel Management Courses</h2>
+    <p class="text-sm text-slate-300 mb-3">
+      Below are example courses offered by different hotel-management colleges in and around Hyderabad.
+      This is only for guidance – please confirm exact details with each college.
     </p>
 
     <table class="table mt-2">
       <tr>
         <th>College</th>
-        <th>Key Course</th>
-        <th>Location</th>
-        <th>Approx. Annual Fees</th>
-        <th>Rating</th>
+        <th>Course</th>
       </tr>
       {rows}
     </table>
     """
-    return render_page(content, "Courses & Colleges")
+    return render_page(content, "Courses")
 
 
 # -------------------- MENTORSHIP --------------------
