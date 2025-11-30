@@ -569,7 +569,8 @@ LOGIN_FORM = """
   <input name="password" type="password" placeholder="Password" required class="input-box">
   <button class="submit-btn">Login</button>
   <p class="text-gray-400 mt-3 text-sm">
-    New here? <a href="/signup" class="text-indigo-400">Create Account</a>
+    New here? <a href="/signup" class="text-indigo-400">Create Account</a><br>
+    <a href="/forgot-password" class="text-rose-400 text-xs">Forgot Password?</a>
   </p>
 </form>
 """
@@ -640,6 +641,14 @@ def login():
             session["user"] = user.name
             session["user_id"] = user.id
             session["ai_history"] = []  # reset chat history
+
+            # FIRST vs SECOND+ login (per browser session)
+            if session.get("visited_before"):
+                session["welcome_msg"] = f"Welcome back, {user.name} 👋"
+            else:
+                session["welcome_msg"] = f"CareerInn welcomes you, {user.name} 🎉"
+                session["visited_before"] = True
+
             return redirect("/dashboard")  # go to DASHBOARD after login
 
         return render_page(
@@ -648,6 +657,26 @@ def login():
         )
 
     return render_page(LOGIN_FORM, "Login")
+
+
+@app.route("/forgot-password", methods=["GET", "POST"])
+def forgot_password():
+    form = """
+    <form method="POST" class="auth-card">
+      <h2 class="text-xl font-bold mb-4">Reset Password</h2>
+      <input name="email" placeholder="Enter your registered email" class="input-box" required>
+      <button class="submit-btn">Send Reset Link</button>
+      <p class="text-[11px] text-slate-400 mt-2">*(demo only – no email system yet)</p>
+    </form>
+    """
+
+    if request.method == "POST":
+        return render_page(
+            "<p class='text-green-400 text-sm mb-3'>If this email exists, a reset link will be sent. (demo)</p>" + form,
+            "Forgot Password"
+        )
+
+    return render_page(form, "Forgot Password")
 
 
 @app.route("/logout")
@@ -664,6 +693,7 @@ def dashboard():
 
     user_id = session["user_id"]
     user_name = session["user"]
+    welcome_msg = session.get("welcome_msg", f"Welcome back, {user_name} 👋")
 
     tab = request.args.get("tab")
     if request.method == "POST":
@@ -716,7 +746,7 @@ def dashboard():
     # ----- PANELS -----
     home_panel = f"""
       <div class="space-y-4">
-        <h2 class="text-2xl md:text-3xl font-bold">Welcome back, {user_name} 👋</h2>
+        <h2 class="text-2xl md:text-3xl font-bold">{welcome_msg}</h2>
         <p class="text-sm text-slate-300">
           This is your personal hospitality dashboard. Track your skills, upload your resume link,
           and see how ready you are for hotel &amp; hospitality careers.
@@ -949,6 +979,7 @@ def dashboard():
         panel_html = about_panel
 
     base_tab_cls = "block w-full text-left px-3 py-2 rounded-lg text-xs md:text-sm"
+
     def cls(name):
         return (
             base_tab_cls + " bg-indigo-600 text-white border border-indigo-500"
@@ -960,7 +991,7 @@ def dashboard():
     <div class="max-w-6xl mx-auto">
       <div class="mb-4">
         <p class="text-xs text-slate-400">Profile · Hotel &amp; Hospitality</p>
-        <h1 class="text-2xl md:text-3xl font-bold">Student Dashboard</h1>
+        <h1 class="text-2xl md:text-3xl font-bold">User Profile</h1>
       </div>
 
       <div class="grid md:grid-cols-[220px,1fr] gap-6">
