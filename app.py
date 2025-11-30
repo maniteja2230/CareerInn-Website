@@ -1022,41 +1022,44 @@ def dashboard():
 
 
 # -------------------- COURSES – ONLY COURSES LIST --------------------
+# -------------------- COURSES – ONLY COURSES LIST (NO COLLEGES) --------------------
 @app.route("/courses")
 def courses():
     db = get_db()
-    # just use college+course list, simple view
-    data = db.query(College).order_by(College.name.asc()).all()
+    # get all colleges, we will only use the course names
+    data = db.query(College).all()
     db.close()
 
+    # unique course names, sorted
+    course_names = sorted({col.course for col in data})
+
     rows = ""
-    for col in data:
+    for course in course_names:
         rows += f"""
         <tr>
-          <td>{col.name}</td>
-          <td>{col.course}</td>
+          <td>{course}</td>
         </tr>
         """
 
     if not rows:
-        rows = "<tr><td colspan='2'>No courses found yet.</td></tr>"
+        rows = "<tr><td>No courses found yet.</td></tr>"
 
     content = f"""
     <h2 class="text-3xl font-bold mb-4">Hospitality &amp; Hotel Management Courses</h2>
     <p class="text-sm text-slate-300 mb-3">
-      Below are example courses offered by different hotel-management colleges in and around Hyderabad.
+      Below are example course names related to hotel management and hospitality.
       This is only for guidance – please confirm exact details with each college.
     </p>
 
     <table class="table mt-2">
       <tr>
-        <th>College</th>
         <th>Course</th>
       </tr>
       {rows}
     </table>
     """
     return render_page(content, "Courses")
+
 
 
 # -------------------- COLLEGES – WITH FILTERS (budget + rating) --------------------
