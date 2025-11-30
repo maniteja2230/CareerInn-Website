@@ -227,47 +227,55 @@ BASE_HTML = """
 <body class="bg-[#050815] text-white">
 
 <div class="min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950">
+
   <!-- NAVBAR -->
   <nav class="flex justify-between items-center px-6 md:px-10 py-4 bg-black/40 backdrop-blur-md border-b border-slate-800">
-    <div class="flex items-center gap-3">
-      <div class="w-12 h-12 rounded-2xl bg-slate-900 flex items-center justify-center shadow-lg shadow-indigo-500/40 overflow-hidden">
-        <img src="/static/logo.png" class="w-11 h-11 object-contain" alt="CareerInn logo">
+      
+      <!-- LOGO + TITLE -->
+      <div class="flex items-center gap-3">
+        <div class="w-12 h-12 rounded-2xl bg-slate-900 flex items-center justify-center shadow-lg shadow-indigo-500/40 overflow-hidden">
+          <img src="/static/logo.png" class="w-11 h-11 object-contain" alt="CareerInn logo">
+        </div>
+        <div>
+          <p class="font-bold text-lg md:text-xl tracking-tight">CareerInn</p>
+          <p class="text-[11px] text-slate-400">Hospitality Careers · Colleges · Jobs</p>
+        </div>
       </div>
-      <div>
-        <p class="font-bold text-lg md:text-xl tracking-tight">CareerInn</p>
-        <p class="text-[11px] text-slate-400">Hospitality Careers · Courses · Jobs</p>
+
+      <!-- NAV LINKS -->
+      <div class="hidden md:flex items-center gap-6 text-sm">
+          <a href="/" class="hover:text-indigo-400">Home</a>
+          <a href="/courses" class="hover:text-indigo-400">Courses</a>
+          <a href="/mentorship" class="hover:text-indigo-400">Mentorship</a>
+          <a href="/jobs" class="hover:text-indigo-400">Jobs</a>
+          <a href="/chatbot" class="hover:text-indigo-400">AI Career Bot</a>
+          <a href="/support" class="hover:text-indigo-400">Support</a>
+
+          {% if session.get('user') %}
+            <span class="px-3 py-1.5 text-[13px] text-slate-300 border border-slate-700 rounded-full">
+              Hi, {{ session.get('user') }}
+            </span>
+            <a href="/logout" class="px-4 py-1.5 rounded-full bg-rose-500 hover:bg-rose-600 text-xs font-semibold shadow shadow-rose-500/40">
+              Logout
+            </a>
+          {% else %}
+            <a href="/login" class="px-4 py-1.5 rounded-full bg-indigo-500 hover:bg-indigo-600 text-xs font-semibold shadow shadow-indigo-500/40">
+              Login
+            </a>
+          {% endif %}
       </div>
-    </div>
-
-    <div class="hidden md:flex items-center gap-6 text-sm">
-      <a href="/" class="hover:text-indigo-400">Home</a>
-      <a href="/courses" class="hover:text-indigo-400">Courses</a>
-      <a href="/chatbot" class="hover:text-indigo-400">AI Career Bot</a>
-      <a href="/mentorship" class="hover:text-indigo-400">Mentorship</a>
-      <a href="/jobs" class="hover:text-indigo-400">Jobs</a>
-      <a href="/support" class="hover:text-indigo-400">Support</a>
-
-      {% if session.get('user') %}
-        <a href="/dashboard" class="px-4 py-1.5 rounded-full bg-indigo-500 hover:bg-indigo-600 text-xs font-semibold shadow shadow-indigo-500/40">
-          {{ session.get('user') }}
-        </a>
-      {% else %}
-        <a href="/login" class="px-4 py-1.5 rounded-full bg-indigo-500 hover:bg-indigo-600 text-xs font-semibold shadow shadow-indigo-500/40">
-          Login
-        </a>
-      {% endif %}
-    </div>
   </nav>
 
   <!-- PAGE CONTENT -->
   <main class="px-5 md:px-10 py-8">
-    {{ content|safe }}
+      {{ content|safe }}
   </main>
-</div>
 
+</div>
 </body>
 </html>
 """
+
 
 
 def render_page(content_html, title="CareerInn"):
