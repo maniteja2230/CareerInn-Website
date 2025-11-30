@@ -47,9 +47,11 @@ Base = declarative_base()
 
 class User(Base):
     __tablename__ = "users"
+
     id = Column(Integer, primary_key=True)
     name = Column(String(255), nullable=False)
-    email = Column(String(255), unique=True, nullable=False)
+    # unique + index so we can’t have same email twice
+    email = Column(String(255), unique=True, index=True, nullable=False)
     password = Column(String(255), nullable=False)
 
 
@@ -542,59 +544,79 @@ LOGIN_FORM = """
 @app.route("/signup", methods=["GET", "POST"])
 def signup():
     if request.method == "POST":
-        name = request.form.get("name", "").strip()
-        email = request.form.get("email", "").strip().lower()
-        password = request.form.get("password", "").strip()
+        name = (request.form.get("name") or "").strip()
+        email = (request.form.get("email") or "").strip().lower()
+        password = (request.form.get("password") or "").strip()
 
-        db = get_db()
-        if db.query(User).filter_by(email=email).first():
-            db.close()
+        if not name or not email or not password:
             return render_page(
-                "<p class='text-red-400 text-sm mb-3'>Email already exists.</p>" + SIGNUP_FORM,
+                "<p class='text-red-400 text-sm mb-3'>All fields are required.</p>"
+                + SIGNUP_FORM,
                 "Signup"
             )
 
-        user = User(name=name, email=email, password=password)
-        db.add(user)
-        db.commit()
-        db.close()
+        db = get_db()
+        try:
+            # check if email already exists
+            existing = db.query(User).filter_by(email=email).first()
+            if existing:
+                db.close()
+                return render_page(
+                    "<p class='text-red-400 text-sm mb-3'>This email is already registered. Please login instead.</p>"
+                    + SIGNUP_FORM,
+                    "Signup"
+                )
+
+            user = User(name=name, email=email, password=password)
+            db.add(user)
+            db.commit()
+        finally:
+            db.close()
+
         return redirect("/login")
 
     return render_page(SIGNUP_FORM, "Signup")
 
 
+
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
-        email = request.form.get("email", "").strip().lower()
-        password = request.form.get("password", "").strip()
+        email = (request.form.get("email") or "").strip().lower()
+        password = (request.form.get("password") or "").strip()
 
         db = get_db()
-        user = db.query(User).filter_by(email=email, password=password).first()
-
-        if user:
-            # track in session
-            session["user"] = user.name
-            session["user_id"] = user.id
-
-            # read AI usage for this user
-            usage = db.query(AiUsage).filter_by(user_id=user.id).first()
-            session["ai_used"] = bool(usage and usage.ai_used >= 1)
-
+        try:
+            user = db.query(User).filter_by(email=email).first()
+        finally:
             db.close()
 
-            # reset in-session chat history
-            session["ai_history"] = []
+        # 1) email not found
+        if not user:
+            return render_page(
+                "<p class='text-red-400 text-sm mb-3'>No account found with this email. Please signup first.</p>"
+                + LOGIN_FORM,
+                "Login"
+            )
 
-            return redirect("/")  # go to HOME after login
+        # 2) wrong password
+        if user.password != password:
+            return render_page(
+                "<p class='text-red-400 text-sm mb-3'>Incorrect password. Please try again.</p>"
+                + LOGIN_FORM,
+                "Login"
+            )
 
-        db.close()
-        return render_page(
-            "<p class='text-red-400 text-sm mb-3'>Invalid email or password.</p>" + LOGIN_FORM,
-            "Login"
-        )
+        # 3) success
+        session["user_id"] = user.id      # used by chatbot
+        session["user"] = user.name       # used for navbar greeting
+        session["ai_history"] = []        # clear chat history for this login
+        # IMPORTANT: do NOT reset per-user free-chat counter here
+
+        return redirect("/")
 
     return render_page(LOGIN_FORM, "Login")
+
 
 
 @app.route("/logout")
