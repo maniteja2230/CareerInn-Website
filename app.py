@@ -1,4 +1,5 @@
-# app.py - updated full file
+# app.py - FINAL COMPLETE CODE for CareerInn (Hospitality & Tech)
+
 import os
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
@@ -24,14 +25,18 @@ from sqlalchemy import (
 from sqlalchemy.orm import declarative_base, sessionmaker, scoped_session
 from groq import Groq
 
-# -------------------- CONFIG --------------------
+# -------------------- CONFIG & ENVIRONMENT --------------------
 app = Flask(__name__)
-app.secret_key = os.getenv("FLASK_SECRET_KEY", "careerinn_secure_key")
-
-# Uploads folder (kept for compatibility but prev-papers upload disabled)
-UPLOAD_FOLDER = os.path.join(os.path.dirname(__file__), "uploads")
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+# Load key from environment (MUST be set in Render Environment Variables)
+app.secret_key = os.getenv("FLASK_SECRET_KEY", "careerinn_secure_key_default_fallback") 
+app.config["UPLOAD_FOLDER"] = os.path.join(os.path.dirname(__file__), "uploads")
+os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
 ALLOWED_EXTENSIONS = {"pdf"}
+
+# Admin credentials (MUST be set in Render Environment Variables for production security)
+ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "admin_careerinn")
+# Using a fallback hash for local testing only; Render env var is required for live use
+ADMIN_PASSWORD_HASH = generate_password_hash(os.getenv("ADMIN_PASSWORD", "careerinn_admin_secure"), method="pbkdf2:sha256", salt_length=16)
 
 def allowed_file(filename):
     return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
@@ -43,8 +48,9 @@ def get_groq_client():
         return None
     return Groq(api_key=api_key)
 
-# -------------------- DB SETUP --------------------
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///careerinn.db")
+# -------------------- DB SETUP (CRUCIAL: Path for Render Persistent Disk) --------------------
+# This path /var/data must match the Mount Path of your Render Persistent Disk.
+DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:////var/data/careerinn.db")
 engine = create_engine(DATABASE_URL, pool_pre_ping=True)
 SessionLocal = scoped_session(sessionmaker(bind=engine, autoflush=False, autocommit=False))
 Base = declarative_base()
@@ -57,7 +63,7 @@ class User(Base):
     email = Column(String(255), unique=True, index=True, nullable=False)
     password = Column(String(255), nullable=False)
 
-class College(Base):
+class College(Base): # Hospitality College
     __tablename__ = "colleges"
     id = Column(Integer, primary_key=True)
     name = Column(String(255), nullable=False)
@@ -66,20 +72,37 @@ class College(Base):
     course = Column(String(255), nullable=False)
     rating = Column(Float, nullable=False)
 
+class BtechCourse(Base): # B.Tech College
+    __tablename__ = "btech_courses"
+    id = Column(Integer, primary_key=True)
+    name = Column(String(255), nullable=False) # College name
+    location = Column(String(255), nullable=False)
+    fees = Column(Integer, nullable=False)
+    specialization = Column(String(255), nullable=False)
+    rating = Column(Float, nullable=False)
+
 class Mentor(Base):
     __tablename__ = "mentors"
     id = Column(Integer, primary_key=True)
     name = Column(String(255), nullable=False)
     experience = Column(Text, nullable=False)
-    speciality = Column(String(255), nullable=False)
+    speciality = Column(String(255), nullable=False) # e.g., Hotel Ops / CSE / Data Science
 
-class Job(Base):
+class Job(Base): # Hospitality Job
     __tablename__ = "jobs"
     id = Column(Integer, primary_key=True)
     title = Column(Text, nullable=False)
     company = Column(String(255), nullable=False)
     location = Column(String(255), nullable=False)
     salary = Column(String(255), nullable=False)
+
+class BtechJob(Base): # B.Tech Job
+    __tablename__ = "btech_jobs"
+    id = Column(Integer, primary_key=True)
+    title = Column(Text, nullable=False)
+    company = Column(String(255), nullable=False)
+    location = Column(String(255), nullable=False)
+    package = Column(String(255), nullable=False)
 
 class AiUsage(Base):
     __tablename__ = "ai_usage"
@@ -126,67 +149,69 @@ def get_db():
 
 def init_db():
     db = get_db()
+    # Check if DB file exists and has tables. If not, create and seed.
     Base.metadata.create_all(bind=engine)
 
-    # seed colleges
+    # --- Seed Hospitality Colleges ---
     if db.query(College).count() == 0:
         colleges_seed = [
             ("IHM Hyderabad (IHMH)", "DD Colony, Hyderabad", 320000, "BSc in Hospitality & Hotel Administration", 4.6),
             ("NITHM Hyderabad", "Gachibowli, Hyderabad", 280000, "BBA in Tourism & Hospitality", 4.3),
             ("IIHM Hyderabad", "Somajiguda, Hyderabad", 350000, "BA in Hospitality Management", 4.5),
-            ("Regency College of Culinary Arts & Hotel Management", "Himayatnagar, Hyderabad", 240000, "BHM & Culinary Arts", 4.4),
-            ("IHM Shri Shakti", "Kompally, Hyderabad", 260000, "BSc Hotel Management & Catering", 4.2),
-            ("Chennais Amirta IHM – Hyderabad", "Khairatabad, Hyderabad", 180000, "Diploma in Hotel Management", 4.0),
-            ("Westin College of Hotel Management", "Nizampet, Hyderabad", 190000, "Bachelor of Hotel Management (BHM)", 3.9),
-            ("Malla Reddy University – Hotel Management", "Maisammaguda, Hyderabad", 210000, "BSc Hotel Management", 4.1),
-            ("SIITAM Hyderabad", "Tarnaka, Hyderabad", 170000, "BHM", 3.8),
-            ("Zest College of Hotel Management", "Hyderabad", 90000, "Diploma in Hotel Management", 3.7),
-            ("Roots Collegium – Hotel Management", "Somajiguda, Hyderabad", 200000, "BBA in Hotel Management", 4.0),
-            ("Aptech Aviation & Hospitality – Hyderabad", "Ameerpet, Hyderabad", 85000, "Diploma in Aviation & Hospitality", 3.6),
-            ("St. Mary’s College – Hospitality", "Yousufguda, Hyderabad", 140000, "BVoc Hospitality & Tourism", 3.9),
-            ("Aurora’s Degree College – Hotel Management", "Chikkadpally, Hyderabad", 160000, "BHM", 3.8),
-            ("Global College of Hotel Management", "Kukatpally, Hyderabad", 95000, "Diploma in Hotel Operations", 3.7),
+            ("Regency College of Culinary Arts", "Himayatnagar, Hyderabad", 240000, "BHM & Culinary Arts", 4.4),
         ]
         for name, loc, fees, course, rating in colleges_seed:
             db.add(College(name=name, location=loc, fees=fees, course=course, rating=rating))
 
-    # seed mentors
+    # --- Seed B.Tech Colleges ---
+    if db.query(BtechCourse).count() == 0:
+        btech_seed = [
+            ("IIT Hyderabad (IITH)", "Kandi, Sangareddy", 220000, "Computer Science & Engineering (CSE)", 4.8),
+            ("IIIT Hyderabad", "Gachibowli, Hyderabad", 340000, "IT/CSE/ECE", 4.9),
+            ("JNTU Hyderabad (JNTUH)", "Kukatpally, Hyderabad", 125000, "Various B.Tech Specializations", 4.5),
+            ("Gitam Hyderabad", "Rudraram, Sangareddy", 250000, "Computer Science & Emerging Tech", 4.2),
+        ]
+        for name, loc, fees, spec, rating in btech_seed:
+            db.add(BtechCourse(name=name, location=loc, fees=fees, specialization=spec, rating=rating))
+
+    # --- Seed Mentors ---
     if db.query(Mentor).count() == 0:
         mentors_seed = [
-            ("Mentor ... A", "Industry experience ...", "Hotel Ops / Front Office"),
-            ("Mentor ... B", "Industry experience ...", "Culinary / F&B"),
-            ("Mentor ... C", "Industry experience ...", "Abroad & Cruise guidance"),
+            ("Mentor Chef A", "20+ years, 5-star Culinary", "Hotel Ops / Culinary"),
+            ("Mentor Tech B", "Ex-Amazon SDE, 10+ years", "Computer Science / Software Dev"),
+            ("Mentor Global C", "Abroad admissions & cruise guidance", "Hospitality / Global Careers"),
         ]
         for n, exp, spec in mentors_seed:
             db.add(Mentor(name=n, experience=exp, speciality=spec))
 
-    # seed jobs
+    # --- Seed Hospitality Jobs ---
     if db.query(Job).count() == 0:
         jobs_seed = [
-            ("IHM Hyderabad – Management Trainee (Hotel Ops)", "Taj / IHCL", "Pan India", "Avg package ~₹4.5–5.5 LPA"),
-            ("IHM Hyderabad – F&B Associate", "Marriott Hotels", "Hyderabad / Bengaluru", "Avg package ~₹3–4 LPA"),
-            ("NITHM – Guest Relations Executive", "ITC Hotels", "Hyderabad", "Avg package ~₹3.5–4.5 LPA"),
-            ("IIHM Hyderabad – Hospitality Management Trainee", "Accor Hotels", "Pan India / Overseas", "Avg package ~₹4–6 LPA (varies)"),
-            ("Regency College – Commis Chef", "5-star Hotels & QSR chains", "Hyderabad", "Avg package ~₹2.5–3.5 LPA"),
+            ("Management Trainee (Hotel Ops)", "Taj / IHCL", "Pan India", "Avg package ~₹4.5–5.5 LPA"),
+            ("F&B Associate", "Marriott Hotels", "Hyderabad / Bengaluru", "Avg package ~₹3–4 LPA"),
         ]
         for t, c_, loc, sal in jobs_seed:
             db.add(Job(title=t, company=c_, location=loc, salary=sal))
 
-    # seed mock interviews
-    if db.query(MockInterview).count() == 0:
-        db.add(MockInterview(title="Front Office Mock - Common Questions",
-                             notes="Roleplay: guest complains about late check-in. Practice answers for grooming, communication, upsell.",
-                             link="https://www.example.com/mock-frontoffice", uploader_id=None))
-        db.add(MockInterview(title="F&B Service - Interview Tips",
-                             notes="Service etiquette, table setting questions and common scenario-based prompts.",
-                             link="https://www.example.com/mock-fb", uploader_id=None))
+    # --- Seed B.Tech Jobs ---
+    if db.query(BtechJob).count() == 0:
+        btech_jobs_seed = [
+            ("Software Development Engineer I (SDE)", "Microsoft", "Hyderabad / Bengaluru", "Avg package ~₹15–25 LPA"),
+            ("Data Analyst (Tech in Hospitality)", "OYO / Tech Startups", "Hyderabad", "Avg package ~₹6–10 LPA"),
+        ]
+        for t, c_, loc, pkg in btech_jobs_seed:
+            db.add(BtechJob(title=t, company=c_, location=loc, package=pkg))
 
-    # seed previous papers (curated public links)
+    # --- Seed Mock Interviews ---
+    if db.query(MockInterview).count() == 0:
+        db.add(MockInterview(title="Front Office Mock - Common Questions", notes="Roleplay: guest complains about late check-in.", link="https://www.example.com/mock-frontoffice", uploader_id=None))
+        db.add(MockInterview(title="Technical Interview - Data Structures", notes="Practice basic DSA for SDE roles.", link="https://www.example.com/mock-dsa", uploader_id=None))
+    
+    # --- Seed Previous Papers ---
     if db.query(PrevPaper).count() == 0:
-        # These links are public resources or aggregators (seed for demo).
-        db.add(PrevPaper(title="NCHM JEE - PYQ Collection (Aglasem)", year="all", link="https://admission.aglasem.com/nchmct-jee-question-paper/", uploader_id=None, is_upload=False))
-        db.add(PrevPaper(title="NCHM Official site (notices & papers)", year="official", link="https://nchm.gov.in/", uploader_id=None, is_upload=False))
-        db.add(PrevPaper(title="BHM Sample Paper (IOHM IPS Academy)", year="2024", link="https://iohm.ipsacademy.org/media/2024/04/BHM-1st-Sem-Exam-Papers-Feb-Mar-2024-1.pdf", uploader_id=None, is_upload=False))
+        db.add(PrevPaper(title="NCHM JEE - PYQ Collection", year="all", link="https://admission.aglasem.com/nchmct-jee-question-paper/", uploader_id=None, is_upload=False))
+        db.add(PrevPaper(title="JEE Mains - PYQ Collection", year="all", link="https://www.example.com/jee-pyqs", uploader_id=None, is_upload=False))
+
 
     db.commit()
     db.close()
@@ -195,16 +220,17 @@ def init_db():
 def shutdown_session(exception=None):
     SessionLocal.remove()
 
-# init DB
+# init DB - this ensures tables exist and are seeded on first run
 init_db()
 
-# -------------------- AI SYSTEM PROMPT (kept short here) --------------------
+# -------------------- AI SYSTEM PROMPT --------------------
 AI_SYSTEM_PROMPT = """
-You are CareerInn's AI career guide for hospitality and hotel management in Hyderabad.
-Talk friendly and act like a mentor. Ask questions step-by-step.
+You are CareerInn's AI career guide. Your expertise covers both hospitality/hotel management and B.Tech/Engineering careers.
+Talk friendly and act like a mentor. Ask questions step-by-step. Guide the student based on their domain (Hosp. or Tech).
 """
 
-# -------------------- BASE LAYOUT with animated AI popup --------------------
+# -------------------- BASE LAYOUT (UPDATED FOR TECH LINKS) --------------------
+# This block is the core structure. It contains the new B.Tech navigation links.
 BASE_HTML = """
 <!DOCTYPE html>
 <html lang="en">
@@ -228,7 +254,6 @@ BASE_HTML = """
 
 <div class="min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950">
 
-  <!-- NAVBAR -->
   <nav class="flex justify-between items-center px-6 md:px-10 py-4 bg-black/40 backdrop-blur-md border-b border-slate-800">
     <div class="flex items-center gap-3">
       <div class="w-12 h-12 rounded-2xl bg-slate-900 flex items-center justify-center overflow-hidden shadow-lg">
@@ -236,21 +261,22 @@ BASE_HTML = """
       </div>
       <div>
         <p class="font-bold text-lg md:text-xl tracking-tight">CareerInn</p>
-        <p class="text-[11px] text-slate-400">Hospitality Careers · Colleges · Jobs</p>
+        <p class="text-[11px] text-slate-400">Hospitality & Tech Careers · Colleges · Jobs</p>
       </div>
     </div>
 
     <div class="hidden md:flex items-center gap-4">
       <a href="/" class="hover:text-indigo-400">Home</a>
-      <a href="/courses" class="hover:text-indigo-400">Courses</a>
-      <a href="/colleges" class="hover:text-indigo-400">Colleges</a>
-      <a href="/jobs" class="hover:text-indigo-400">Jobs</a>
+      <a href="/courses" class="hover:text-indigo-400">Hosp. Courses</a>
+      <a href="/colleges" class="hover:text-indigo-400">Hosp. Colleges</a>
+      <a href="/btech-colleges" class="hover:text-indigo-400">B.Tech Colleges</a> 
+      <a href="/jobs" class="hover:text-indigo-400">Hosp. Jobs</a>
+      <a href="/btech-jobs" class="hover:text-indigo-400">B.Tech Jobs</a> 
       <a href="/global-match" class="hover:text-indigo-400">Global Match</a>
       <a href="/chatbot" class="hover:text-indigo-400">AI Career Bot</a>
       <a href="/support" class="hover:text-indigo-400">Support</a>
 
       {% if session.get('user') %}
-        <!-- unique profile button with avatar + small unique label down -->
         <div class="flex items-center gap-3">
           <a href="/profile" class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-800 border border-slate-700">
             <div class="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center font-semibold text-sm">
@@ -266,15 +292,13 @@ BASE_HTML = """
     </div>
   </nav>
 
-  <!-- PAGE CONTENT -->
   <main class="px-5 md:px-10 py-8">
       {{ content|safe }}
   </main>
 </div>
 
-<!-- Animated AI FAB -->
 <button id="aiFab" class="ai-fab bg-gradient-to-br from-indigo-500 to-emerald-400">
-  <span class="emoji">👩‍🍳</span>
+  <span class="emoji">👩‍💻</span> 
 </button>
 
 <div id="aiModalBg" class="ai-modal-bg"></div>
@@ -327,7 +351,182 @@ def user_is_subscribed(user_id):
     db.close()
     return bool(sub and sub.active)
 
-# -------------------- HOME (now includes Skills, Mock Interviews, Prev Papers boxes) --------------------
+# -------------------- ADMIN PANEL (START) --------------------
+def is_admin():
+    return session.get("is_admin") == True
+
+@app.route("/admin/login", methods=["GET", "POST"])
+def admin_login():
+    if is_admin():
+        return redirect("/admin")
+    message = ""
+    if request.method == "POST":
+        username = request.form.get("username")
+        password = request.form.get("password")
+        try:
+            authenticated = check_password_hash(ADMIN_PASSWORD_HASH, password)
+        except Exception:
+             authenticated = (ADMIN_PASSWORD_HASH == password) # Fallback if hash generation failed
+
+        if username == ADMIN_USERNAME and authenticated:
+            session["is_admin"] = True
+            return redirect("/admin")
+        else:
+            message = "Invalid credentials."
+    
+    login_form = f"""
+    <div class="max-w-md mx-auto mt-10">
+      <form method="POST" class="auth-card">
+        <h2 class="text-xl font-bold mb-4">Admin Login</h2>
+        <p class="text-red-400 text-sm mb-3">{message}</p>
+        <input name="username" placeholder="Username" required class="input-box">
+        <input name="password" type="password" placeholder="Password" required class="input-box">
+        <button class="submit-btn">Login</button>
+        <p class="text-gray-400 mt-3 text-sm">Default credentials (check Render vars): {ADMIN_USERNAME} / your_admin_password</p>
+      </form>
+    </div>
+    """
+    return render_page(login_form, "Admin Login")
+
+@app.route("/admin/logout")
+def admin_logout():
+    session.pop("is_admin", None)
+    return redirect("/")
+
+@app.route("/admin")
+def admin_panel():
+    if not is_admin():
+        return redirect("/admin/login")
+    
+    db = get_db()
+    hosp_colleges = db.query(College).all()
+    btech_colleges = db.query(BtechCourse).all()
+    hosp_jobs = db.query(Job).all()
+    btech_jobs = db.query(BtechJob).all()
+    mentors = db.query(Mentor).all()
+    users = db.query(User).all()
+    db.close()
+
+    def render_admin_card(title, data, entity_type, *headers):
+        list_items = ""
+        for item in data[:5]:
+            if entity_type == "college":
+                details = f"({item.location}, ₹{item.fees:,}, {item.rating}★)"
+            elif entity_type == "btech_course":
+                details = f"({item.location}, ₹{item.fees:,}, {item.rating}★, {item.specialization})"
+            elif entity_type == "job":
+                details = f"({item.company}, {item.salary})"
+            elif entity_type == "btech_job":
+                details = f"({item.company}, {item.package})"
+            elif entity_type == "mentor":
+                details = f"({item.speciality})"
+            elif entity_type == "user":
+                details = f"({item.email})"
+            else:
+                details = ""
+            name = getattr(item, 'name', None) or getattr(item, 'title', None)
+            list_items += f"<li class='text-xs text-slate-300 truncate'>{name} {details}</li>"
+
+        return f"""
+        <div class="support-box">
+            <h3 class="font-bold text-lg mb-3">{title} ({len(data)})</h3>
+            <ul class="list-disc ml-5 space-y-1">{list_items}</ul>
+            <a href="/admin/{entity_type}/add" class="mt-4 px-3 py-1 text-xs bg-emerald-600 rounded inline-block">Add New</a>
+        </div>
+        """
+
+    content = f"""
+    <h1 class="text-3xl font-bold mb-6">Admin Panel</h1>
+    <a href="/admin/logout" class="px-3 py-1.5 rounded-full bg-rose-600 text-xs font-semibold mb-6 inline-block">Admin Logout</a>
+
+    <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {render_admin_card("Hospitality Colleges", hosp_colleges, "college")}
+        {render_admin_card("B.Tech Colleges", btech_colleges, "btech_course")}
+        {render_admin_card("Hospitality Jobs", hosp_jobs, "job")}
+        {render_admin_card("B.Tech Jobs", btech_jobs, "btech_job")}
+        {render_admin_card("Mentors", mentors, "mentor")}
+        {render_admin_card("Users", users, "user")}
+    </div>
+    """
+    return render_page(content, "Admin Panel")
+
+@app.route("/admin/<entity_type>/add", methods=["GET", "POST"])
+def admin_add(entity_type):
+    if not is_admin(): return redirect("/admin/login")
+    
+    if request.method == "POST":
+        db = get_db()
+        try:
+            if entity_type == "college":
+                db.add(College(name=request.form["name"], location=request.form["location"], fees=int(request.form["fees"]), course=request.form["course"], rating=float(request.form["rating"])))
+            elif entity_type == "btech_course":
+                db.add(BtechCourse(name=request.form["name"], location=request.form["location"], fees=int(request.form["fees"]), specialization=request.form["specialization"], rating=float(request.form["rating"])))
+            elif entity_type == "job":
+                db.add(Job(title=request.form["title"], company=request.form["company"], location=request.form["location"], salary=request.form["salary"]))
+            elif entity_type == "btech_job":
+                db.add(BtechJob(title=request.form["title"], company=request.form["company"], location=request.form["location"], package=request.form["package"]))
+            elif entity_type == "mentor":
+                db.add(Mentor(name=request.form["name"], experience=request.form["experience"], speciality=request.form["speciality"]))
+            db.commit()
+            return redirect("/admin")
+        except Exception as e:
+            db.rollback()
+            return render_page(f"<p class='text-red-400'>Error saving data: {e}</p>", "Admin Error")
+        finally:
+            db.close()
+
+    form_fields = ""
+    if entity_type == "college":
+        form_fields = """
+            <input name="name" placeholder="College Name (Hosp.)" required class="input-box">
+            <input name="location" placeholder="Location" required class="input-box">
+            <input name="fees" type="number" placeholder="Annual Fees (e.g., 320000)" required class="input-box">
+            <input name="course" placeholder="Key Course (e.g., BSc in Hospitality)" required class="input-box">
+            <input name="rating" type="number" step="0.1" placeholder="Rating (e.g., 4.6)" required class="input-box">
+        """
+    elif entity_type == "btech_course":
+        form_fields = """
+            <input name="name" placeholder="College Name (B.Tech)" required class="input-box">
+            <input name="location" placeholder="Location" required class="input-box">
+            <input name="fees" type="number" placeholder="Annual Fees (e.g., 220000)" required class="input-box">
+            <input name="specialization" placeholder="Specialization (e.g., CSE or ECE)" required class="input-box">
+            <input name="rating" type="number" step="0.1" placeholder="Rating (e.g., 4.8)" required class="input-box">
+        """
+    elif entity_type == "job":
+        form_fields = """
+            <input name="title" placeholder="Job Title (Hosp.)" required class="input-box">
+            <input name="company" placeholder="Company/Recruiter" required class="input-box">
+            <input name="location" placeholder="Location" required class="input-box">
+            <input name="salary" placeholder="Avg Package/Salary (e.g., ~₹4.5–5.5 LPA)" required class="input-box">
+        """
+    elif entity_type == "btech_job":
+        form_fields = """
+            <input name="title" placeholder="Job Title (B.Tech SDE/DA)" required class="input-box">
+            <input name="company" placeholder="Company/Recruiter" required class="input-box">
+            <input name="location" placeholder="Location" required class="input-box">
+            <input name="package" placeholder="Avg Package/Salary (e.g., ~₹15–25 LPA)" required class="input-box">
+        """
+    elif entity_type == "mentor":
+        form_fields = """
+            <input name="name" placeholder="Mentor Name" required class="input-box">
+            <textarea name="experience" rows="3" placeholder="Experience summary..." class="input-box h-auto" required></textarea>
+            <input name="speciality" placeholder="Speciality (e.g., CSE, Culinary, Front Office)" required class="input-box">
+        """
+    else:
+        return redirect("/admin")
+    
+    content = f"""
+    <h2 class="text-2xl font-bold mb-4">Add New {entity_type.replace('_', ' ').title()}</h2>
+    <form method="POST" class="space-y-3">
+        {form_fields}
+        <button class="submit-btn">Add {entity_type.title()}</button>
+    </form>
+    """
+    return render_page(content, f"Add {entity_type.title()}")
+# -------------------- ADMIN PANEL (END) --------------------
+
+
+# -------------------- HOME (Integrated Hosp & Tech Cards) --------------------
 @app.route("/")
 def home():
     ai_used = False
@@ -342,7 +541,7 @@ def home():
             ai_used = True
             session["ai_used"] = True
 
-    # CTA logic (logged-in vs not)
+    # CTA logic (logged-in vs not) - kept original logic
     if not ai_used:
         if logged_in:
             cta_html = """
@@ -363,22 +562,21 @@ def home():
             """
     else:
         cta_html = """
-          <div class="flex flex-wrap items-center gap-4 mt-3">
-            <a href="/subscribe" class="primary-cta">🚀 Get started – ₹299 / year</a>
-            <a href="/login" class="ghost-cta">Already have an account?</a>
-            <a href="/chatbot" class="px-4 py-2 rounded-full border border-emerald-400/70 text-xs md:text-sm hover:bg-emerald-500/10">🤖 Continue with AI guidance</a>
-          </div>
-          <p class="hero-footnote">₹299 per student (prototype – real data & payments can plug in later).</p>
-        """
+              <div class="flex flex-wrap items-center gap-4 mt-3">
+                <a href="/subscribe" class="primary-cta">🚀 Get started – ₹299 / year</a>
+                <a href="/login" class="ghost-cta">Already have an account?</a>
+                <a href="/chatbot" class="px-4 py-2 rounded-full border border-emerald-400/70 text-xs md:text-sm hover:bg-emerald-500/10">🤖 Continue with AI guidance</a>
+              </div>
+              <p class="hero-footnote">₹299 per student (prototype – real data & payments can plug in later).</p>
+            """
 
-    # Home content includes 6 feature cards + 3 spotlight boxes (Skills, Mock Interviews, Prev Papers)
     content = f"""
     <div class="max-w-5xl mx-auto mt-6 md:mt-10 space-y-8 hero-shell">
       <section class="grid md:grid-cols-2 gap-10 items-center">
         <div class="space-y-4">
-          <span class="pill-badge"><span class="dot"></span>Hospitality careers · CareerInn</span>
-          <h1 class="text-3xl md:text-4xl font-extrabold leading-tight">Plan your <span class="gradient-text">hotel & hospitality</span> career in one place.</h1>
-          <p class="text-sm md:text-[15px] text-slate-300">One simple yearly pass that puts colleges, mentors, jobs and an AI career guide in a single platform.</p>
+          <span class="pill-badge"><span class="dot"></span>Hospitality & Tech Careers · CareerInn</span>
+          <h1 class="text-3xl md:text-4xl font-extrabold leading-tight">Plan your <span class="gradient-text">Hospitality or B.Tech</span> career path.</h1>
+          <p class="text-sm md:text-[15px] text-slate-300">One simple yearly pass that puts colleges, mentors, jobs and an AI career guide in a single platform, serving both hotel management and B.Tech students.</p>
           {cta_html}
         </div>
         <div class="hero-card rounded-3xl p-7 md:p-9 space-y-5">
@@ -387,51 +585,49 @@ def home():
             <span class="text-5xl font-extrabold text-emerald-300">₹299</span>
             <span class="text-sm text-slate-300 mb-2">per student / year</span>
           </div>
-          <p class="text-[13px] md:text-sm text-slate-300">Students can explore hospitality careers, compare colleges, and get mentor & AI guidance in one simple space.</p>
+          <p class="text-[13px] md:text-sm text-slate-300">Students can explore careers, compare colleges, and get mentor & AI guidance in one simple space.</p>
         </div>
       </section>
 
       <section class="space-y-4">
         <h3 class="text-sm font-semibold text-slate-200">CareerInn Spaces:</h3>
         <div class="grid gap-4 md:grid-cols-3 lg:grid-cols-6">
-          <a href="/courses" class="feature-card">📘 Courses<p class="sub">See key hospitality courses.</p></a>
-          <a href="/colleges" class="feature-card">🏫 Colleges<p class="sub">Hyderabad hotel-management colleges.</p></a>
-          <a href="/mentorship" class="feature-card">🧑‍🏫 Mentorship<p class="sub">Talk to hospitality mentors (demo).</p></a>
-          <a href="/jobs" class="feature-card">💼 Jobs &amp; Placements<p class="sub">Avg packages &amp; recruiters snapshot.</p></a>
-          <a href="/global-match" class="feature-card">🌍 Global Match<p class="sub">Abroad colleges &amp; internships overview.</p></a>
+          <a href="/courses" class="feature-card">🏨 Hosp. Courses<p class="sub">See key hospitality courses.</p></a>
+          <a href="/btech-colleges" class="feature-card">💻 B.Tech Colleges<p class="sub">Hyderabad B.Tech colleges & specializations.</p></a> 
+          <a href="/colleges" class="feature-card">🏫 Hosp. Colleges<p class="sub">Hyderabad hotel-management colleges.</p></a>
+          <a href="/jobs" class="feature-card">💼 Hosp. Jobs<p class="sub">Hosp. avg packages & recruiters.</p></a>
+          <a href="/btech-jobs" class="feature-card">⚙️ B.Tech Jobs<p class="sub">Tech avg packages & roles.</p></a> 
           <a href="/chatbot" class="feature-card">🤖 AI Career Bot<p class="sub">Chat to get a suggested path.</p></a>
         </div>
       </section>
 
-      <!-- Spotlight Row: Skills, Mock Interviews, Previous Papers -->
       <section class="grid md:grid-cols-3 gap-4 mt-6">
         <div class="support-box">
           <h3 class="font-semibold mb-2">Top Skills (quick)</h3>
-          <p class="text-sm text-slate-300">Free preview of important hospitality skills. Subscribe to edit and get custom suggestions.</p>
+          <p class="text-sm text-slate-300">Free preview of important career skills. Subscribe to edit and get custom suggestions.</p>
           <div class="mt-3"><a href="/dashboard?tab=skills" class="px-3 py-2 rounded-full bg-indigo-600">View Skills</a></div>
         </div>
 
         <div class="support-box">
           <h3 class="font-semibold mb-2">Mock Interviews</h3>
-          <p class="text-sm text-slate-300">Practice roleplay interviews. Subscribe to unlock AI mock interviewer and full practice list.</p>
+          <p class="text-sm text-slate-300">Practice roleplay interviews (Hosp. or Tech). Subscribe to unlock AI mock interviewer and full practice list.</p>
           <div class="mt-3"><a href="/mock-interviews" class="px-3 py-2 rounded-full bg-emerald-500">Open Mock Interviews</a></div>
         </div>
 
         <div class="support-box">
           <h3 class="font-semibold mb-2">Previous Year Papers</h3>
-          <p class="text-sm text-slate-300">Curated past papers from official sources (view-only).</p>
+          <p class="text-sm text-slate-300">Curated past papers (NCHM/JEE) from official sources (view-only).</p>
           <div class="mt-3"><a href="/prev-papers" class="px-3 py-2 rounded-full bg-indigo-600">View Papers</a></div>
         </div>
       </section>
     </div>
     """
-    return render_page(content, "CareerInn | Home")
+    return render_page(content, "CareerInn | Home (Hosp & Tech)")
 
-# -------------------- COURSES (only courses) --------------------
+# -------------------- COURSES (Hospitality) --------------------
 @app.route("/courses")
 def courses():
     db = get_db()
-    # distinct courses only
     data = db.query(College.course).distinct().all()
     db.close()
     rows = ""
@@ -439,15 +635,15 @@ def courses():
         course_name = c[0] if isinstance(c, (list, tuple)) else c
         rows += f"<tr><td>{course_name}</td></tr>"
     if not rows:
-        rows = "<tr><td>No courses found yet.</td></tr>"
+        rows = "<tr><td>No hospitality courses found yet.</td></tr>"
     content = f"""
     <h2 class="text-3xl font-bold mb-4">Hospitality & Hotel Management Courses</h2>
     <p class="text-sm text-slate-300 mb-3">Below are example courses offered by different hotel-management colleges in and around Hyderabad.</p>
     <table class="table mt-2"><tr><th>Course</th></tr>{rows}</table>
     """
-    return render_page(content, "Courses")
+    return render_page(content, "Hosp. Courses")
 
-# -------------------- COLLEGES (filters unchanged) --------------------
+# -------------------- COLLEGES (Hospitality) --------------------
 @app.route("/colleges")
 def colleges():
     budget = request.args.get("budget", "").strip()
@@ -500,9 +696,69 @@ def colleges():
     </form>
     <table class="table mt-2"><tr><th>College</th><th>Key Course</th><th>Location</th><th>Approx. Annual Fees</th><th>Rating</th></tr>{rows}</table>
     """
-    return render_page(content, "Colleges")
+    return render_page(content, "Hosp. Colleges")
 
-# -------------------- JOBS & PLACEMENTS (with detail route to avoid click errors) --------------------
+# -------------------- B.TECH COLLEGES (NEW) --------------------
+@app.route("/btech-colleges")
+def btech_colleges():
+    budget = request.args.get("budget", "").strip()
+    rating_min = request.args.get("rating", "").strip()
+    specialization = request.args.get("specialization", "").strip()
+    
+    db = get_db()
+    query = db.query(BtechCourse)
+    
+    if budget == "lt1": query = query.filter(BtechCourse.fees < 100000)
+    elif budget == "b1_2": query = query.filter(BtechCourse.fees.between(100000, 200000))
+    elif budget == "b2_3": query = query.filter(BtechCourse.fees.between(200000, 300000))
+    elif budget == "gt3": query = query.filter(BtechCourse.fees > 300000)
+    
+    if rating_min:
+        try:
+            rating_val = float(rating_min)
+            query = query.filter(BtechCourse.rating >= rating_val)
+        except ValueError:
+            pass
+
+    if specialization:
+        query = query.filter(BtechCourse.specialization.like(f"%{specialization}%"))
+
+    data = query.order_by(BtechCourse.rating.desc()).all()
+    db.close()
+    
+    rows = ""
+    for col in data:
+        rows += f"<tr><td>{col.name}</td><td>{col.specialization}</td><td>{col.location}</td><td>₹{col.fees:,}</td><td>{col.rating:.1f}★</td></tr>"
+    if not rows:
+        rows = "<tr><td colspan='5'>No B.Tech colleges match this filter yet.</td></tr>"
+
+    sel_any_b = "selected" if budget == "" else ""
+    sel_r_any = "selected" if rating_min == "" else ""
+
+    content = f"""
+    <h2 class="text-3xl font-bold mb-4">Hyderabad B.Tech – Colleges & Courses</h2>
+    <form method="GET" class="mb-3 grid md:grid-cols-4 gap-3 items-center">
+        <select name="budget" class="search-bar">
+            <option value="" {sel_any_b}>Any budget</option>
+            <option value="lt1">Below ₹1,00,000</option>
+            <option value="b1_2">₹1,00,000 – ₹2,00,000</option>
+            <option value="b2_3">₹2,00,000 – ₹3,00,000</option>
+            <option value="gt3">Above ₹3,00,000</option>
+        </select>
+        <select name="rating" class="search-bar">
+            <option value="" {sel_r_any}>Any rating</option>
+            <option value="4.0">4.0★ &amp; above</option>
+            <option value="4.5">4.5★ &amp; above</option>
+        </select>
+        <input name="specialization" placeholder="E.g. CSE or ECE" class="search-bar" value="{specialization}">
+        <button class="px-3 py-2 bg-indigo-600 rounded text-sm">Filter</button>
+    </form>
+    <table class="table mt-2"><tr><th>College</th><th>Key Specialization</th><th>Location</th><th>Approx. Annual Fees</th><th>Rating</th></tr>{rows}</table>
+    """
+    return render_page(content, "B.Tech Colleges")
+
+
+# -------------------- JOBS (Hospitality) --------------------
 @app.route("/jobs")
 def jobs():
     db = get_db()
@@ -510,7 +766,6 @@ def jobs():
     db.close()
     cards = ""
     for j in data:
-        # link to detail page to avoid click errors
         cards += f"""
         <div class="job-card">
           <h3 class="font-bold text-sm md:text-base mb-1"><a href="/jobs/{j.id}" class="hover:underline">{j.title}</a></h3>
@@ -520,10 +775,10 @@ def jobs():
         </div>
         """
     content = f"""
-    <h2 class="text-3xl font-bold mb-4">Placements & Recruiters Snapshot</h2>
+    <h2 class="text-3xl font-bold mb-4">Hospitality Placements & Recruiters Snapshot</h2>
     <div class="grid md:grid-cols-3 gap-6">{cards}</div>
     """
-    return render_page(content, "Jobs & Placements")
+    return render_page(content, "Hosp. Jobs")
 
 @app.route("/jobs/<int:job_id>")
 def job_detail(job_id):
@@ -541,6 +796,31 @@ def job_detail(job_id):
     """
     return render_page(content, "Job detail")
 
+
+# -------------------- B.TECH JOBS (NEW) --------------------
+@app.route("/btech-jobs")
+def btech_jobs():
+    db = get_db()
+    data = db.query(BtechJob).all()
+    db.close()
+    cards = ""
+    for j in data:
+        # Note: BtechJob uses 'package' instead of 'salary'
+        cards += f"""
+        <div class="job-card">
+          <h3 class="font-bold text-sm md:text-base mb-1">{j.title}</h3>
+          <p class="text-indigo-300 text-xs md:text-sm">Recruiter: {j.company}</p>
+          <p class="text-gray-400 text-xs md:text-sm">Location: {j.location}</p>
+          <p class="text-green-300 font-semibold text-xs md:text-sm mt-1">Avg package: {j.package}</p>
+        </div>
+        """
+    content = f"""
+    <h2 class="text-3xl font-bold mb-4">B.Tech Placements & Recruiters Snapshot</h2>
+    <div class="grid md:grid-cols-3 gap-6">{cards}</div>
+    """
+    return render_page(content, "B.Tech Jobs & Placements")
+
+
 # -------------------- MENTORSHIP (subscription locked) --------------------
 @app.route("/mentorship")
 def mentorship():
@@ -548,7 +828,7 @@ def mentorship():
     if not user_is_subscribed(user_id):
         content = """
         <h2 class="text-3xl font-bold mb-4">Find Mentors</h2>
-        <p class="text-sm text-slate-300 mb-4">Mentorship is available to subscribed users only.</p>
+        <p class="text-sm text-slate-300 mb-4">Mentorship is available to subscribed users only. Mentors cover both hospitality and tech domains.</p>
         <a href="/subscribe" class="px-4 py-2 bg-indigo-600 rounded">Subscribe to unlock</a>
         """
         return render_page(content, "Mentorship")
@@ -560,6 +840,7 @@ def mentorship():
         cards += f"<div class='mentor-card'><h3 class='text-lg font-bold mb-1'>{m.name}</h3><p class='text-sm text-gray-300'>{m.experience}</p><p class='text-sm text-indigo-300 mb-2'>{m.speciality}</p></div>"
     return render_page(f"<h2 class='text-3xl font-bold mb-4'>Find Mentors</h2><div class='grid md:grid-cols-3 gap-6'>{cards}</div>", "Mentorship")
 
+
 # -------------------- Mock Interviews (subscription gated) --------------------
 @app.route("/mock-interviews", methods=["GET", "POST"])
 def mock_interviews():
@@ -567,7 +848,7 @@ def mock_interviews():
     if not user_is_subscribed(user_id):
         content = """
         <h2 class="text-3xl font-bold mb-4">Mock Interviews & Practice</h2>
-        <p class="text-sm text-slate-300 mb-4">Mock interview resources are available to subscribed users only.</p>
+        <p class="text-sm text-slate-300 mb-4">Mock interview resources (Hosp. & Tech) are available to subscribed users only.</p>
         <a href="/subscribe" class="px-4 py-2 bg-indigo-600 rounded">Subscribe to unlock</a>
         """
         return render_page(content, "Mock Interviews (Locked)")
@@ -588,10 +869,10 @@ def mock_interviews():
         uploader = " (by you)" if user_id and it.uploader_id == user_id else ""
         cards += f"<div class='support-box'><h3 class='font-semibold mb-1'>{it.title}{uploader}</h3><p class='text-xs text-slate-300 mb-2'>{it.notes or ''}</p>{(f'<a href=\"{it.link}\" target=\"_blank\" class=\"text-indigo-300 text-sm underline\">Open resource</a>' if it.link else '')}</div>"
     content = f"""
-    <h2 class="text-3xl font-bold mb-4">Mock Interviews & Practice</h2>
-    <p class="text-sm text-slate-300 mb-4">Practice mock interviews for hospitality roles. You can also use the AI Mock Interview Bot below.</p>
+    <h2 class="text-3xl font-bold mb-4">Mock Interviews & Practice (Hosp. & Tech)</h2>
+    <p class="text-sm text-slate-300 mb-4">Practice mock interviews for both hospitality and technical roles. You can also use the AI Mock Interview Bot below.</p>
     <form method="POST" class="mb-4 space-y-2">
-      <input name="title" placeholder="Title (eg: Front Office - Live Roleplay)" class="input-box" required>
+      <input name="title" placeholder="Title (eg: Technical Interview - DSA Basics)" class="input-box" required>
       <input name="link" placeholder="Video / doc link (optional)" class="input-box">
       <textarea name="notes" rows="3" placeholder="Short notes..." class="input-box h-auto"></textarea>
       <button class="px-4 py-2 rounded-full bg-indigo-600">Add mock interview</button>
@@ -611,7 +892,8 @@ def mock_interview_ai():
         user_msg = request.form.get("message", "").strip()
         if user_msg:
             history.append({"role":"user","content":user_msg})
-            messages = [{"role":"system","content":"You are an AI mock interviewer for hospitality roles. Ask scenario questions, give feedback."}] + history
+            # System prompt updated to cover both domains
+            messages = [{"role":"system","content":"You are an AI mock interviewer for hospitality and B.Tech roles. Ask scenario questions, give technical questions, and provide constructive feedback."}] + history
             groq_client = get_groq_client()
             if groq_client is None:
                 reply = "AI not configured. Please set GROQ_API_KEY."
@@ -628,10 +910,11 @@ def mock_interview_ai():
     for m in history:
         who = "You" if m["role"]=="user" else "Interviewer"
         html += f"<div class='mb-3'><div class='text-xs text-slate-400 mb-0.5'>{who}</div><div class='inline-block px-3 py-2 rounded-2xl {'bg-indigo-600' if m['role']=='user' else 'bg-slate-800'} text-xs md:text-sm max-w-[90%]'>{m['content']}</div></div>"
-    html += "</div><form method='POST' class='flex gap-2'><input name='message' autocomplete='off' placeholder='Answer a question or type start...' class='flex-1 input-box' required><button class='px-4 py-2 rounded-full bg-indigo-600 hover:bg-indigo-500 text-sm font-semibold'>Send</button></form></div>"
+    html += "</div><form method='POST' class='flex gap-2'><input name='message' autocomplete='off' placeholder='Start by stating your target role (e.g. Front Office or SDE)...' class='flex-1 input-box' required><button class='px-4 py-2 rounded-full bg-indigo-600 hover:bg-indigo-500 text-sm font-semibold'>Send</button></form></div>"
     return render_page(html, "AI Mock Interview")
 
-# -------------------- Previous Papers (view-only curated list) --------------------
+
+# -------------------- Previous Papers --------------------
 @app.route("/prev-papers")
 def prev_papers():
     db = get_db()
@@ -650,14 +933,14 @@ def prev_papers():
         rows = "<tr><td colspan='3'>No papers yet.</td></tr>"
     content = f"""
     <h2 class="text-3xl font-bold mb-4">Previous Year Question Papers (view-only)</h2>
-    <p class="text-sm text-slate-300 mb-4">Curated past papers and official resources. Uploading is disabled — papers are sourced externally for accuracy.</p>
+    <p class="text-sm text-slate-300 mb-4">Curated past papers and official resources for both NCHM JEE and B.Tech entrance exams.</p>
     <table class="table mt-2"><tr><th>Title</th><th>Year</th><th>Link</th></tr>{rows}</table>
     """
     return render_page(content, "Previous Year Papers")
 
 @app.route("/uploads/<path:filename>")
 def uploaded_file(filename):
-    return send_from_directory(UPLOAD_FOLDER, filename, as_attachment=False)
+    return send_from_directory(app.config["UPLOAD_FOLDER"], filename, as_attachment=False)
 
 # -------------------- GLOBAL MATCH (locked) --------------------
 @app.route("/global-match")
@@ -666,27 +949,27 @@ def global_match():
     if not user_is_subscribed(user_id):
         content = """
         <h2 class="text-3xl font-bold mb-4">Global College & Internship Match</h2>
-        <p class="text-sm text-slate-300 mb-4">Global matching info is for subscribed users. Subscribe to unlock guidance on abroad options and internships.</p>
+        <p class="text-sm text-slate-300 mb-4">Global matching info is for subscribed users. Subscribe to unlock guidance on abroad options for both Hospitality and Master's (Tech) degrees.</p>
         <a href="/subscribe" class="px-4 py-2 bg-indigo-600 rounded">Subscribe to unlock</a>
         """
         return render_page(content, "Global Match (Locked)")
     content = """
     <h2 class="text-3xl font-bold mb-4">Global College & Internship Match</h2>
-    <p class="text-gray-300 mb-4 text-sm">Many hospitality students explore abroad options after base degree or diploma.</p>
+    <p class="text-gray-300 mb-4 text-sm">Advice for students looking at abroad options after their base degree/diploma, covering both streams.</p>
     <div class="grid md:grid-cols-3 gap-5 mb-6">
-      <div class="support-box"><h3 class="font-semibold mb-2">Popular Countries</h3><ul class="text-sm text-slate-200"><li>Switzerland</li><li>UAE</li><li>Singapore</li><li>Canada</li></ul></div>
-      <div class="support-box"><h3 class="font-semibold mb-2">Typical Requirements</h3><ul class="text-sm text-slate-200"><li>Good English</li><li>IELTS / language tests</li><li>Clear SOP</li></ul></div>
-      <div class="support-box"><h3 class="font-semibold mb-2">Internship Patterns</h3><ul class="text-sm text-slate-200"><li>6–12 month internships</li><li>Front office, F&B, culinary roles</li></ul></div>
+      <div class="support-box"><h3 class="font-semibold mb-2">Hospitality Destinations</h3><ul class="text-sm text-slate-200"><li>Switzerland (Top M.Sc)</li><li>UAE (Luxury Jobs)</li><li>Canada (Immigration path)</li></ul></div>
+      <div class="support-box"><h3 class="font-semibold mb-2">Tech Masters (MS) Options</h3><ul class="text-sm text-slate-200"><li>USA (CS/Data Science)</li><li>Germany (Engineering)</li><li>Canada (IT/AI)</li></ul></div>
+      <div class="support-box"><h3 class="font-semibold mb-2">Typical Requirements</h3><ul class="text-sm text-slate-200"><li>Good English (IELTS/TOEFL)</li><li>Strong SOP/LORs</li><li>GMAT/GRE (for Masters)</li></ul></div>
     </div>
     """
     return render_page(content, "Global Match")
 
-# -------------------- Chatbot and AI flows (kept) --------------------
+# -------------------- Chatbot and AI flows --------------------
 CHATBOT_HTML = """
 <div class="max-w-3xl mx-auto space-y-6">
   <h1 class="text-3xl font-bold mb-2">CareerInn AI Mentor</h1>
   {% if not locked %}
-    <p class="text-sm text-slate-300 mb-4">This AI bot will ask about your marks... You get <b>one free full chat session.</b></p>
+    <p class="text-sm text-slate-300 mb-4">This AI bot will ask about your goals, marks, and interests. You get <b>one free full chat session.</b></p>
   {% else %}
     <p class="text-sm text-slate-300 mb-4">Your <b>free AI career chat is finished</b> for this account. Please purchase the ₹299/year Student Pass and connect with a mentor for more guidance.</p>
   {% endif %}
@@ -705,7 +988,7 @@ CHATBOT_HTML = """
         </div>
       {% endfor %}
     {% else %}
-      <p class="text-sm text-slate-400">👋 Hi! I’m CareerInn AI. Tell me your name and your latest class (10th / 12th / degree), and approximate marks.</p>
+      <p class="text-sm text-slate-400">👋 Hi! I’m CareerInn AI. Tell me your name, which stream you are interested in (Hospitality or B.Tech), and your latest marks.</p>
     {% endif %}
   </div>
   {% if not locked %}
@@ -727,22 +1010,26 @@ def chatbot():
         return redirect("/login")
     db = get_db()
     usage = db.query(AiUsage).filter_by(user_id=user_id).first()
-    locked = bool(usage and usage.ai_used == 1)
+    locked = bool(usage and usage.ai_used == 1 and not user_is_subscribed(user_id))
+    
     if request.args.get("reset") == "1":
         session["ai_history"] = []
         db.close()
         return redirect("/chatbot")
+        
     history = session.get("ai_history", [])
     if not isinstance(history, list):
         history = []
     session["ai_history"] = history
+    
     if request.method == "POST":
         if locked:
-            history.append({"role":"assistant","content":"⚠ Your free AI career chat session has ended.\nPlease check the Student Pass (₹299/year) on the home page and talk to mentors for more guidance."})
+            history.append({"role":"assistant","content":"⚠ Your free AI career chat session has ended and subscription is required to continue.\nPlease check the Student Pass (₹299/year) on the home page."})
             session["ai_history"] = history
             db.close()
             html = render_template_string(CHATBOT_HTML, history=history, locked=True)
             return render_page(html, "CareerInn AI Mentor")
+            
         user_msg = request.form.get("message", "").strip()
         if user_msg:
             history.append({"role":"user","content":user_msg})
@@ -756,27 +1043,15 @@ def chatbot():
                     reply = resp.choices[0].message.content
                 except Exception as e:
                     reply = f"AI error: {e}"
+                    
             history.append({"role":"assistant","content":reply})
             session["ai_history"] = history
+            
     db.close()
     html = render_template_string(CHATBOT_HTML, history=history, locked=locked)
     return render_page(html, "CareerInn AI Mentor")
 
-@app.route("/finish")
-def finish():
-    user_id = session.get("user_id")
-    if not user_id:
-        return redirect("/login")
-    db = get_db()
-    usage = db.query(AiUsage).filter_by(user_id=user_id).first()
-    if usage is None:
-        usage = AiUsage(user_id=user_id, ai_used=1)
-        db.add(usage)
-    else:
-        usage.ai_used = 1
-    db.commit()
-    db.close()
-    return redirect("/chatbot")
+# Note: The /finish route is removed as /chatbot/end handles the same function more gracefully.
 
 @app.route("/chatbot/end", methods=["POST"])
 def end_chatbot():
@@ -880,7 +1155,6 @@ def login():
             session["user"] = user.name
             session["user_id"] = user.id
             session["ai_history"] = []
-            # keep first_time_login in session - show welcome once
             if session.get("first_time_login") is None:
                 session["first_time_login"] = True
             return redirect("/dashboard")
@@ -998,17 +1272,9 @@ def dashboard():
     # Prefill skills for subscribed users if empty
     if not skills_text and user_is_subscribed(user_id):
         skills_text = ", ".join([
-            "English communication",
-            "Grooming & presentation",
-            "Customer service",
-            "Food safety (HACCP basics)",
-            "Table service & etiquette",
-            "Culinary basics",
-            "POS & billing",
-            "Teamwork",
-            "Time management",
-            "Hygiene & SOPs",
-            "Basic accounting"
+            "English communication", "Customer service", "Food safety (HACCP basics)", "Table service & etiquette", 
+            "Culinary basics", "Python/Java basics", "Data Structures", "POS & billing", "Teamwork", 
+            "Time management"
         ])
         db = get_db()
         profile = db.query(UserProfile).filter_by(user_id=user_id).first()
@@ -1021,9 +1287,9 @@ def dashboard():
       <div class="bg-slate-900/70 border border-slate-800 rounded-2xl p-4">
         <h3 class="font-semibold mb-2">CareerInn guidance</h3>
         <ul class="text-xs text-slate-300">
-          <li>• Focus on English & grooming for front-office roles.</li>
-          <li>• Start basic F&B internships to learn service flow.</li>
-          <li>• Build a 1-page resume highlighting internships & hospitality skills.</li>
+          <li>• **Hosp:** Focus on English & grooming for front-office roles.</li>
+          <li>• **Tech:** Build projects using Python/Java for SDE roles.</li>
+          <li>• Build a 1-page resume highlighting internships & key skills (Hosp. or Tech).</li>
           <li>• Use the AI bot to prepare for interviews and SOPs.</li>
         </ul>
       </div>
@@ -1041,7 +1307,7 @@ def dashboard():
     home_panel = f"""
       <div class="space-y-4">
         <h2 class="text-2xl md:text-3xl font-bold">{greeting}, {user_name}</h2>
-        <p class="text-sm text-slate-300">This is your personal hospitality dashboard. Track your skills, upload your resume link, and see how ready you are for hotel & hospitality careers.</p>
+        <p class="text-sm text-slate-300">This is your personal career dashboard. Track your skills, upload your resume link, and see how ready you are for hotel & B.Tech careers.</p>
 
         <div class="grid md:grid-cols-3 gap-4 mt-4">
           <div class="dash-box"><p class="text-xs text-slate-400">Career readiness rating</p><p class="text-2xl font-bold mt-1">{self_rating}/5</p></div>
@@ -1059,14 +1325,11 @@ def dashboard():
       </div>
     """
 
-    # Mentors, Skills, Rating, Resume, FAQs as before; show locked UI for skills if not subscribed
-    # (omitted repeated code for brevity here, but same as previous block). We'll construct panels similarly:
-
     if not user_is_subscribed(user_id):
         mentors_panel = """
           <div class="space-y-4">
             <h2 class="text-2xl md:text-3xl font-bold">Mentor connections 🧑‍🏫</h2>
-            <p class="text-sm text-slate-300">This area requires a subscription. Please subscribe to access mentor details and booking.</p>
+            <p class="text-sm text-slate-300">This area requires a subscription. Please subscribe to access mentor details and booking (mentors cover both Hosp. and Tech).</p>
             <a href="/subscribe" class="px-4 py-2 bg-indigo-600 rounded text-sm">Subscribe to unlock</a>
           </div>
         """
@@ -1078,7 +1341,6 @@ def dashboard():
           </div>
         """
     else:
-        # full skills UI
         def skills_chips_with_remove(skills_csv):
             skills = [s.strip() for s in skills_csv.split(",") if s.strip()]
             if not skills:
@@ -1091,10 +1353,11 @@ def dashboard():
         skills_panel = f"""
           <div class="space-y-4">
             <h2 class="text-2xl md:text-3xl font-bold">Skills & strengths ⭐</h2>
+            <p class="text-xs text-slate-300">Manage skills for Hospitality or B.Tech roles. Separate with commas.</p>
             <div class="mt-3"><label class="block text-xs text-slate-300 mb-1">Your skills (quick chips)</label>{skills_chips_with_remove(skills_text)}</div>
             <form method="POST" action="/dashboard" class="flex gap-2 mt-3">
               <input type="hidden" name="tab" value="skills_add">
-              <input name="new_skill" placeholder="Add a skill (e.g. Grooming, Customer Service)" class="input-box flex-1" />
+              <input name="new_skill" placeholder="Add a skill (e.g. Grooming, Python, DSA)" class="input-box flex-1" />
               <button class="px-3 py-1 rounded-full bg-indigo-600">Add</button>
             </form>
             <form method="POST" class="space-y-4 mt-4">
@@ -1103,7 +1366,7 @@ def dashboard():
                 <label class="block text-xs text-slate-300 mb-1">Full skill list (comma-separated)</label>
                 <textarea name="skills_text" rows="4" class="input-box h-auto">{skills_text}</textarea>
               </div>
-              <div><label class="block text-xs text-slate-300 mb-1">Target roles</label><textarea name="target_roles" rows="3" class="input-box h-auto">{target_roles}</textarea></div>
+              <div><label class="block text-xs text-slate-300 mb-1">Target roles (e.g., F&B Associate, SDE)</label><textarea name="target_roles" rows="3" class="input-box h-auto">{target_roles}</textarea></div>
               <div class="grid md:grid-cols-2 gap-4 items-center"><div><label class="block text-xs text-slate-300 mb-1">Rate readiness (0–5)</label><input name="self_rating" type="number" min="0" max="5" value="{self_rating}" class="input-box" /></div></div>
               <button class="submit-btn mt-2">Save skills</button>
             </form>
@@ -1113,6 +1376,7 @@ def dashboard():
     rating_panel = f"""
       <div class="space-y-4">
         <h2 class="text-2xl md:text-3xl font-bold">Career rating overview 📊</h2>
+        <p class="text-sm text-slate-300">Your self-assessment. Use the Skills tab to update this rating.</p>
         <div class="mt-4 bg-slate-900/70 border border-slate-700 rounded-2xl p-4">
           <p class="text-xs text-slate-400">Self-rating (0–5)</p>
           <div class="flex items-center gap-3"><div class="flex gap-1">
@@ -1128,8 +1392,8 @@ def dashboard():
         <h2 class="text-2xl md:text-3xl font-bold">Resume & profile link 📄</h2>
         <form method="POST" class="space-y-4 mt-4">
           <input type="hidden" name="tab" value="resume">
-          <div><label class="block text-xs text-slate-300 mb-1">Resume link</label><input name="resume_link" class="input-box" placeholder="https://drive.google.com/..." value="{resume_link}"></div>
-          <div><label class="block text-xs text-slate-300 mb-1">Notes for mentor</label><textarea name="notes" rows="3" class="input-box h-auto">{notes}</textarea></div>
+          <div><label class="block text-xs text-slate-300 mb-1">Resume link (Google Drive / GitHub / Portfolio)</label><input name="resume_link" class="input-box" placeholder="https://drive.google.com/..." value="{resume_link}"></div>
+          <div><label class="block text-xs text-slate-300 mb-1">Notes for mentor (e.g., which roles you applied for)</label><textarea name="notes" rows="3" class="input-box h-auto">{notes}</textarea></div>
           <button class="submit-btn mt-2">Save resume details</button>
         </form>
         {"<p class='text-xs text-emerald-300 mt-2'>Current resume link: <a href='" + resume_link + "' target='_blank' class='underline'>" + resume_link + "</a></p>" if resume_link else ""}
@@ -1141,15 +1405,15 @@ def dashboard():
         <h2 class="text-2xl md:text-3xl font-bold">FAQs ❓</h2>
         <div class="space-y-3 text-sm text-slate-200">
           <div><p class="font-semibold">Is ₹299 / year a real payment?</p><p class="text-slate-300 text-xs">Prototype demo; payment not live.</p></div>
-          <div><p class="font-semibold">Are college details official?</p><p class="text-slate-300 text-xs">No. Always confirm with college.</p></div>
+          <div><p class="font-semibold">Are college details official?</p><p class="text-slate-300 text-xs">No. Always confirm with college. Data is seeded for demonstration.</p></div>
         </div>
       </div>
     """
 
     about_panel = """
       <div class="space-y-4">
-        <h2 class="text-2xl md:text-3xl font-bold">About CareerInn 🏨</h2>
-        <p class="text-sm text-slate-300">CareerInn helps students plan hospitality careers.</p>
+        <h2 class="text-2xl md:text-3xl font-bold">About CareerInn 🏨💻</h2>
+        <p class="text-sm text-slate-300">CareerInn helps students plan careers in two high-growth areas: Hospitality/Hotel Management and B.Tech/Engineering, recognizing the synergy between them.</p>
       </div>
     """
 
@@ -1175,7 +1439,7 @@ def dashboard():
 
     content = f"""
     <div class="max-w-6xl mx-auto">
-      <div class="mb-4"><p class="text-xs text-slate-400">Profile · Hotel & Hospitality</p><h1 class="text-2xl md:text-3xl font-bold">Student Dashboard</h1></div>
+      <div class="mb-4"><p class="text-xs text-slate-400">Profile · Hotel & Hospitality & Tech</p><h1 class="text-2xl md:text-3xl font-bold">Student Dashboard</h1></div>
       <div class="grid md:grid-cols-[220px,1fr] gap-6">
         <aside class="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 h-max">
           <p class="text-[11px] text-slate-400 mb-2">Your space</p>
@@ -1216,6 +1480,7 @@ def profile():
             <li>• Take short F&B internships to learn service flow.</li>
             <li>• Build a one-page resume highlighting internships & skills.</li>
             <li>• Use the AI bot to prepare for interviews and SOPs.</li>
+            <li>• **B.Tech:** Start coding projects on GitHub early.</li>
           </ul>
         </div>
         <div>
@@ -1244,4 +1509,6 @@ def support():
 
 # -------------------- MAIN --------------------
 if __name__ == "__main__":
+    # WARNING: Do NOT use app.run(debug=True) in a live Render environment.
+    # The Procfile command `gunicorn app:app` handles production deployment.
     app.run(debug=True)
