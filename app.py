@@ -224,7 +224,7 @@ BASE_HTML = """
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>{{ title or "CareerInn-Tech" }}</title>
+  <title>{{ title or "CareerInnTech" }}</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="/static/style.css">
@@ -286,7 +286,7 @@ BASE_HTML = """
 
 <!-- AI FAB -->
 <button id="aiFab" class="ai-fab bg-gradient-to-br from-indigo-500 to-emerald-400">
-  <span class="emoji">👩‍🍳</span>
+  <span class="emoji">🤖</span>
 </button>
 
 <div id="aiModal" class="ai-modal">
