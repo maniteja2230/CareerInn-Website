@@ -163,11 +163,37 @@ def init_db():
             ("IHM Hyderabad (IHMH)", "DD Colony, Hyderabad", 320000, "BSc Hospitality & Hotel Admin", 4.6, "hospitality"),
             ("IIHM Hyderabad", "Somajiguda, Hyderabad", 350000, "BA Hospitality Management", 4.5, "hospitality"),
             ("Regency College of Culinary Arts", "Himayatnagar, Hyderabad", 240000, "BHM & Culinary Arts", 4.4, "hospitality"),
+            ("Institute of Hotel Management (IHM) Shri Shakti", "Medchal, Hyderabad", 150000, "Hotel Management", 4.3, "hospitality"),
+            ("National Institute of Tourism & Hospitality Management (NITHM)", "Gachibowli, Hyderabad", 200000, "BSc Hospitality & Hotel Admin", 4.1, "hospitality"),
+            ("International Institute of Hotel Management (IIHM) Hyderabad", "Panjagutta, Hyderabad", 350000, "Hospitality Management Programs", 4.5, "hospitality"),
+            ("Indian Institute of Hotel Management and Culinary Arts (IIHMCA)", "Habsiguda, Hyderabad", 180000, "Culinary Arts & Hotel Management", 4.3, "hospitality"),
+            ("Trinity College of Hotel Management", "Kukatpally, Hyderabad", 100000, "Hotel Management Courses", 4.0, "hospitality"),
+            ("Chennais Amirta International Institute of Hotel Management (CAIIHM)", "Ameerpet, Hyderabad",150000, "Hotel Management Programs", 4.2, "hospitality"),
+            ("Leo Academy of Hospitality & Hotel Management", "Secunderabad, Hyderabad", 90000, "Hotel Management", 3.9, "hospitality")
+]
+            
             # BTech
             ("JNTU Hyderabad", "Kukatpally, Hyderabad", 90000, "B.Tech CSE / ECE", 4.1, "btech"),
             ("Osmania University - Engineering", "Hyderabad", 80000, "B.Tech All Branches", 4.0, "btech"),
             ("VNR Vignana Jyothi", "Ghatkesar, Hyderabad", 150000, "B.Tech CSE", 4.2, "btech"),
             ("IIIT Hyderabad", "Gachibowli, Hyderabad", 300000, "B.Tech CSE", 4.8, "btech"),
+            ("CBIT - Chaitanya Bharathi Institute of Technology", "Gandipet, Hyderabad", 160000, "B.Tech CSE / ECE / EEE / MECH", 4.3, "btech"),
+            ("Vasavi College of Engineering", "Ibrahimbagh, Hyderabad", 140000, "B.Tech CSE / IT / ECE", 4.4, "btech"),
+            ("MVSR Engineering College", "Nadergul, Hyderabad", 120000, "B.Tech All Branches", 4.1, "btech"),
+            ("G. Narayanamma Institute of Technology (GNIT)", "Shaikpet, Hyderabad", 150000, "B.Tech CSE / ECE / IT", 4.2, "btech"),
+            ("BITS Pilani - Hyderabad Campus", "Shamirpet, Hyderabad", 550000, "B.E CSE / ECE / MECH / CHEM", 4.7, "btech"),
+            ("BVRIT Narsapur", "Narsapur, Hyderabad", 180000, "B.Tech CSE / ECE / EEE / IT", 4.3, "btech"),
+            ("Vardhaman College of Engineering", "Shamshabad, Hyderabad", 130000, "B.Tech CSE / ECE / IT", 4.3, "btech"),
+            ("Malla Reddy Engineering College", "Maisammaguda, Hyderabad", 110000, "B.Tech All Branches", 4.0, "btech"),
+            ("Guru Nanak Institutions (GNI)", "Ibrahimpatnam, Hyderabad", 90000, "B.Tech All Branches", 4.0, "btech"),
+            ("Anurag University", "Ghatkesar, Hyderabad", 150000, "B.Tech CSE / ECE / AI & DS", 4.2, "btech"),
+            ("KMIT - Keshav Memorial Institute of Technology", "Narayanguda, Hyderabad", 200000, "B.Tech CSE / IT", 4.5, "btech"),
+            ("Mahindra University (MU)", "Bahadurpally, Hyderabad", 350000, "B.Tech CSE / AI / ECE", 4.6, "btech"),
+            ("CMR College of Engineering & Technology", "Kandlakoya, Hyderabad", 120000, "B.Tech CSE / IT / ECE", 4.1, "btech"),
+            ("Sreenidhi Institute of Science and Technology (SNIST)", "Ghatkesar, Hyderabad", 150000, "B.Tech CSE / ECE", 4.2, "btech"),
+            ("JNTUH College of Engineering Sultanpur", "Sultanpur, Hyderabad", 60000, "B.Tech All Branches", 4.1, "btech"),
+            ("MLR Institute of Technology (MLRIT)", "Dundigal, Hyderabad", 130000, "B.Tech CSE / ECE", 4.1, "btech")
+            
         ]
         for name, loc, fees, course, rating, track in colleges_seed:
             db.add(College(name=name, location=loc, fees=fees, course=course, rating=rating, track=track))
@@ -377,7 +403,7 @@ def home():
       </section>
     </div>
     """
-    return render_page(content, "CareerInn-Tech | Home")
+    return render_page(content, "CareerInnTech | Home")
 
 # -------------------- ABOUT/CONTACT/SUPPORT --------------------
 @app.route("/about")
