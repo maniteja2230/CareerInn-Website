@@ -374,7 +374,7 @@ def home():
     <div class="max-w-6xl mx-auto space-y-8">
       <section class="grid md:grid-cols-2 gap-8 items-center">
         <div>
-          <h1 class="text-4xl font-bold">CareerInn-Tech — BTech & Hospitality careers in one platform</h1>
+          <h1 class="text-4xl font-bold">CareerInnTech — BTech & Hospitality careers in one platform</h1>
           <p class="text-lg text-slate-300 mt-3">Personalized roadmaps, mentors, project bank, interview practice and curated colleges — all in a single student pass.</p>
           <div class="mt-4">{cta_html}</div>
         </div>
@@ -409,8 +409,8 @@ def home():
 def about():
     content = """
     <div class="max-w-4xl mx-auto">
-      <h1 class="text-3xl font-bold mb-3">About CareerInn-Tech</h1>
-      <p class="text-sm text-slate-300">CareerInn-Tech integrates hospitality and BTech career guidance into one single student-first platform. Personalized roadmaps, mentor connect, project bank, and AI-powered practice.</p>
+      <h1 class="text-3xl font-bold mb-3">About CareerInnTech</h1>
+      <p class="text-sm text-slate-300">CareerInnTech integrates hospitality and BTech career guidance into one single student-first platform. Personalized roadmaps, mentor connect, project bank, and AI-powered practice.</p>
     </div>
     """
     return render_page(content, "About")
@@ -420,7 +420,7 @@ def contact():
     content = """
     <div class="max-w-4xl mx-auto">
       <h1 class="text-2xl font-bold mb-3">Contact</h1>
-      <p class="text-sm text-slate-300">Email: support@careerinn-tech.com</p>
+      <p class="text-sm text-slate-300">Email: support@careerinntech.com</p>
     </div>
     """
     return render_page(content, "Contact")
