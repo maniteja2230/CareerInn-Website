@@ -417,17 +417,18 @@ def user_is_subscribed(user_id):
 @app.route("/landing")
 def landing():
     content = """
-    <div class="min-h-screen flex flex-col justify-center">
+    <div class="text-center pt-10 pb-6">
+      <h1 class="text-6xl md:text-7xl font-extrabold tracking-wide
+                 bg-gradient-to-r from-indigo-400 via-violet-400 to-emerald-400
+                 bg-clip-text text-transparent">
+        CareerInnTech
+      </h1>
+    
+      <p class="text-base text-slate-400 mt-2">
+        BTech • Hospitality • Careers
+      </p>
+    </div>
 
-      <!-- CENTER BRAND (ADDED ONLY) -->
-      <div class="text-center mb-12">
-        <h1 class="text-4xl font-extrabold tracking-wide">
-          CareerInnTech
-        </h1>
-        <p class="text-sm text-slate-400">
-          BTech • Hospitality • Careers
-        </p>
-      </div>
 
       <!-- EXISTING LAYOUT (UNCHANGED) -->
       <div class="max-w-7xl mx-auto grid md:grid-cols-2 gap-16 items-center">
