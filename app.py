@@ -1262,10 +1262,22 @@ def login():
         authenticated = False
 
         if user:
-            try:
+            # Case 1: password is hashed (normal case)
+            if user.password.startswith("pbkdf2:"):
                 authenticated = check_password_hash(user.password, password)
-            except Exception:
-                authenticated = (user.password == password)
+        
+            # Case 2: old plain-text password (auto-fix)
+            elif user.password == password:
+                authenticated = True
+        
+                # 🔒 auto-upgrade to hashed password
+                user.password = generate_password_hash(
+                    password,
+                    method="pbkdf2:sha256",
+                    salt_length=16
+                )
+                db.commit()
+
 
         if authenticated:
             session["user"] = user.name
