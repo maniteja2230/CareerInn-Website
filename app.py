@@ -414,11 +414,75 @@ def user_is_subscribed(user_id):
     db.close()
     return bool(s and s.active)
 
+@app.route("/landing")
+def landing():
+    content = """
+    <div class="max-w-7xl mx-auto grid md:grid-cols-2 gap-10 items-center">
+
+      <!-- LEFT: ABOUT -->
+      <div>
+        <h1 class="text-4xl font-bold mb-4">
+          CareerInnTech
+        </h1>
+        <p class="text-lg text-slate-300 mb-4">
+          One platform for BTech & Hospitality students.
+          Career roadmaps, colleges, skills, mentors, mock interviews,
+          and AI-powered guidance.
+        </p>
+
+        <ul class="text-slate-300 space-y-2">
+          <li>✔ Personalized career guidance</li>
+          <li>✔ Colleges, courses & cutoffs</li>
+          <li>✔ Skill videos & mock interviews</li>
+          <li>✔ AI mentor & mentorship access</li>
+        </ul>
+      </div>
+
+      <!-- RIGHT: AUTH -->
+      <div class="bg-slate-900 p-6 rounded-2xl space-y-4">
+        <h2 class="text-2xl font-semibold">Get Started</h2>
+
+        <a href="/login"
+           class="block text-center px-4 py-3 rounded-xl bg-indigo-600 font-semibold">
+          Login
+        </a>
+
+        <a href="/signup"
+           class="block text-center px-4 py-3 rounded-xl bg-emerald-600 font-semibold">
+          Create Account
+        </a>
+
+        <p class="text-xs text-slate-400 text-center">
+          New users get one free AI career chat
+        </p>
+      </div>
+
+    </div>
+    """
+    return render_page(content, "CareerInnTech")
+
+
 # -------------------- HOME --------------------
+
+
 @app.route("/")
 def home():
+    if "user_id" in session:
+        return redirect("/home")
+    return redirect("/landing")
+
+
+@app.route("/home")
+def home_logged_in():
+    if "user_id" not in session:
+        return redirect("/landing")
+
     user_id = session.get("user_id")
-    logged_in = bool(user_id)
+    logged_in = True
+
+
+
+
     # CTA text: one free AI chat then subscribe 499
     cta_html = ""
     if logged_in:
@@ -451,6 +515,7 @@ def home():
         </div>
       </section>
 
+
       <section>
         <h3 class="text-lg font-semibold mb-3">Explore</h3>
         <div class="grid md:grid-cols-3 gap-4">
@@ -462,6 +527,32 @@ def home():
           <a href="/chatbot" class="feature-card">🤖 AI Career Bot<p class="text-xs text-slate-400">One free chat per user.</p></a>
         </div>
       </section>
+
+       <section class="mt-10">
+          <h3 class="text-lg font-semibold mb-3">Skills</h3>
+        
+          <div class="support-box max-w-3xl">
+            <p class="text-sm text-slate-300 mb-4">
+              Choose your track to explore structured skill videos with filters.
+            </p>
+        
+            <div class="flex flex-wrap gap-4">
+              <a href="/skills?track=btech"
+                 class="px-6 py-3 rounded-xl bg-indigo-600 font-semibold">
+                🎓 BTech Skills
+              </a>
+        
+              <a href="/skills?track=hospitality"
+                 class="px-6 py-3 rounded-xl bg-emerald-600 font-semibold">
+                🏨 Hospitality Skills
+              </a>
+            </div>
+        
+            <p class="text-xs text-slate-400 mt-4">
+              Includes branch-wise skills, videos, and category filters.
+            </p>
+          </div>
+        </section>
     </div>
     """
     return render_page(content, "CareerInnTech | Home")
@@ -1013,7 +1104,7 @@ def onboarding():
         profile.notes = request.form.get("notes", "").strip()
         db.commit()
         db.close()
-        return redirect("/dashboard")
+        return redirect("/home")
 
     db.close()
 
@@ -1082,7 +1173,7 @@ def login():
             if not profile.onboarded:
                 return redirect("/onboarding")
 
-            return redirect("/dashboard")
+            return redirect("/home")
 
         db.close()
         return render_page("<p class='text-red-400'>Invalid credentials.</p>" + LOGIN_FORM)
