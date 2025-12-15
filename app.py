@@ -417,49 +417,69 @@ def user_is_subscribed(user_id):
 @app.route("/landing")
 def landing():
     content = """
-    <div class="max-w-7xl mx-auto grid md:grid-cols-2 gap-10 items-center">
+    <div class="max-w-7xl mx-auto grid md:grid-cols-2 gap-16 items-center min-h-screen">
 
-      <!-- LEFT: ABOUT -->
-      <div>
-        <h1 class="text-4xl font-bold mb-4">
-          CareerInnTech
+      <!-- LEFT SIDE: HERO TEXT -->
+      <div class="flex flex-col justify-center">
+        <h1 class="text-6xl font-extrabold leading-tight">
+          Build confidence.<br>
+          <span class="text-indigo-400">Shape your career.</span>
         </h1>
-        <p class="text-lg text-slate-300 mb-4">
-          One platform for BTech & Hospitality students.
-          Career roadmaps, colleges, skills, mentors, mock interviews,
-          and AI-powered guidance.
+
+        <p class="text-2xl text-slate-300 mt-8 max-w-xl">
+          CareerInnTech helps BTech and Hospitality students choose the right
+          path with structured guidance, mentors, real college data,
+          and AI-powered support.
         </p>
 
-        <ul class="text-slate-300 space-y-2">
-          <li>✔ Personalized career guidance</li>
-          <li>✔ Colleges, courses & cutoffs</li>
-          <li>✔ Skill videos & mock interviews</li>
-          <li>✔ AI mentor & mentorship access</li>
+        <ul class="mt-8 space-y-4 text-slate-300 text-lg">
+          <li>✔ Clear career roadmaps</li>
+          <li>✔ Skills that actually matter</li>
+          <li>✔ Colleges, cutoffs & fees</li>
+          <li>✔ Mentors, mock interviews & AI</li>
         </ul>
+
+        <p class="mt-8 text-sm text-slate-400">
+          Built for students who want clarity — not confusion.
+        </p>
       </div>
 
-      <!-- RIGHT: AUTH -->
-      <div class="bg-slate-900 p-6 rounded-2xl space-y-4">
-        <h2 class="text-2xl font-semibold">Get Started</h2>
+      <!-- RIGHT SIDE: TALL AUTH PANEL -->
+      <div class="flex justify-center">
+        <div class="bg-slate-900 w-[340px] min-h-[520px] p-8 rounded-3xl
+                    flex flex-col justify-center space-y-6
+                    border border-slate-800 shadow-2xl">
 
-        <a href="/login"
-           class="block text-center px-4 py-3 rounded-xl bg-indigo-600 font-semibold">
-          Login
-        </a>
+          <h2 class="text-3xl font-semibold text-center">
+            Get Started
+          </h2>
 
-        <a href="/signup"
-           class="block text-center px-4 py-3 rounded-xl bg-emerald-600 font-semibold">
-          Create Account
-        </a>
+          <p class="text-sm text-slate-400 text-center">
+            Create your free CareerInnTech account
+          </p>
 
-        <p class="text-xs text-slate-400 text-center">
-          New users get one free AI career chat
-        </p>
+          <a href="/login"
+             class="block text-center py-3 rounded-xl bg-indigo-600
+                    font-semibold text-lg">
+            Login
+          </a>
+
+          <a href="/signup"
+             class="block text-center py-3 rounded-xl bg-emerald-600
+                    font-semibold text-lg">
+            Create Account
+          </a>
+
+          <p class="text-xs text-slate-500 text-center mt-6">
+            🎁 One free AI career chat for every new user
+          </p>
+        </div>
       </div>
 
     </div>
     """
     return render_page(content, "CareerInnTech")
+
 
 
 # -------------------- HOME --------------------
