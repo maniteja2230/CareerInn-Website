@@ -519,7 +519,6 @@ def courses():
     # Step 2: Fetch courses + skills
     db = get_db()
     courses_data = db.query(Course).filter_by(track=track).all()
-    skills_data = db.query(Skill).filter_by(track=track).all()
     db.close()
 
     # Step 3: Build course cards
@@ -538,33 +537,6 @@ def courses():
         </div>
         """
 
-    # Step 4: Group skills (Branch → Skills)
-    from collections import defaultdict
-    skill_map = defaultdict(list)
-
-    for s in skills_data:
-        skill_map[s.category].append(s)
-
-    skills_html = ""
-    for category, items in skill_map.items():
-        skills_html += f"""
-        <div class='support-box mb-5'>
-          <h3 class='font-semibold mb-2'>{category} Skills</h3>
-        """
-        for sk in items:
-            video = (
-                f"<video controls class='w-full mt-2 rounded bg-black'>"
-                f"<source src='{sk.video_link}' type='video/mp4'>"
-                f"</video>"
-                if sk.video_link else ""
-            )
-            skills_html += f"""
-            <div class='mb-3'>
-              <p class='text-sm'>{sk.name}</p>
-              {video}
-            </div>
-            """
-        skills_html += "</div>"
 
     # Step 5: Final page render
     content = f"""
@@ -577,9 +549,6 @@ def courses():
         {cards}
       </div>
 
-      <div class="mt-6">
-        {skills_html}
-      </div>
 
       <div class="mt-4">
         <a href="/" class="px-3 py-1 rounded bg-indigo-600">Back</a>
@@ -588,6 +557,106 @@ def courses():
     """
 
     return render_page(content, "Courses")
+
+# -------------------- SKILLS (SEPARATE + FILTERED) --------------------
+@app.route("/skills")
+def skills():
+    track = request.args.get("track", "").strip()
+    category = request.args.get("category", "").strip()
+
+    # Step 1: Ask track first
+    if not track:
+        content = """
+        <div class="max-w-2xl mx-auto">
+          <h2 class="text-2xl font-bold">Choose Track for Skills</h2>
+          <p class="text-sm text-slate-300">Select your track to view relevant skills.</p>
+          <div class="mt-4 flex gap-3">
+            <a href="/skills?track=btech" class="primary-cta">BTech Skills</a>
+            <a href="/skills?track=hospitality" class="primary-cta">Hospitality Skills</a>
+          </div>
+        </div>
+        """
+        return render_page(content, "Skills")
+
+    # Step 2: Fetch skills with filters
+    db = get_db()
+    query = db.query(Skill).filter_by(track=track)
+
+    if category:
+        query = query.filter(Skill.category == category)
+
+    skills_data = query.all()
+
+    # fetch distinct categories for filter dropdown
+    categories = (
+        db.query(Skill.category)
+        .filter_by(track=track)
+        .distinct()
+        .all()
+    )
+    db.close()
+
+    categories = [c[0] for c in categories]
+
+    # Step 3: Group skills by category
+    from collections import defaultdict
+    skill_map = defaultdict(list)
+
+    for s in skills_data:
+        skill_map[s.category].append(s)
+
+    # Step 4: Build skills UI
+    skills_html = ""
+    for cat, items in skill_map.items():
+        skills_html += f"""
+        <div class="support-box mb-6">
+          <h3 class="font-semibold text-lg mb-3">{cat}</h3>
+        """
+        for sk in items:
+            skills_html += f"""
+            <div class="mb-4">
+              <p class="text-sm font-medium">{sk.name}</p>
+              <video controls class="w-full mt-2 rounded-xl bg-black">
+                <source src="{sk.video_link}" type="video/mp4">
+                Your browser does not support the video tag.
+              </video>
+            </div>
+            """
+        skills_html += "</div>"
+
+    if not skills_html:
+        skills_html = "<p class='text-slate-400'>No skills found for this filter.</p>"
+
+    # Step 5: Filters UI
+    options_html = "<option value=''>All Categories</option>"
+    for c in categories:
+        selected = "selected" if c == category else ""
+        options_html += f"<option value='{c}' {selected}>{c}</option>"
+
+    content = f"""
+    <div class="max-w-6xl mx-auto">
+      <h2 class="text-2xl font-bold mb-4">
+        Skills — {'BTech' if track=='btech' else 'Hospitality'}
+      </h2>
+
+      <form method="GET" class="grid md:grid-cols-3 gap-3 mb-5">
+        <input type="hidden" name="track" value="{track}">
+        <select name="category" class="input-box">
+          {options_html}
+        </select>
+        <button class="submit-btn">Apply Filter</button>
+      </form>
+
+      {skills_html}
+
+      <div class="mt-4">
+        <a href="/" class="px-3 py-1 rounded bg-indigo-600">Back</a>
+      </div>
+    </div>
+    """
+
+    return render_page(content, "Skills")
+
 
    
 
@@ -1001,11 +1070,16 @@ def login():
             session["ai_history"] = []
             session["first_time_login"] = True
 
-            # ✅ NEW: onboarding check (PATCH)
+            # ✅ GUARANTEE profile exists (FIX)
             profile = db.query(UserProfile).filter_by(user_id=user.id).first()
+            if profile is None:
+                profile = UserProfile(user_id=user.id)
+                db.add(profile)
+                db.commit()
+
             db.close()
 
-            if profile and not profile.onboarded:
+            if not profile.onboarded:
                 return redirect("/onboarding")
 
             return redirect("/dashboard")
