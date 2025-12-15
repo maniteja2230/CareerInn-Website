@@ -540,22 +540,21 @@ def home_logged_in():
 
     content = f"""
     <div class="max-w-6xl mx-auto space-y-8">
-      <section class="grid md:grid-cols-2 gap-8 items-center">
-        <div>
-          <h1 class="text-4xl font-bold">CareerInnTech — BTech & Hospitality careers in one platform</h1>
-          <p class="text-lg text-slate-300 mt-3">Personalized roadmaps, mentors, project bank, interview practice and curated colleges — all in a single student pass.</p>
-          <div class="mt-4">{cta_html}</div>
-        </div>
-        <div class="hero-card rounded-2xl p-6">
-          <h3 class="text-xl font-semibold mb-2">Student Pass — ₹499 / year</h3>
-          <ul class="text-sm text-slate-200">
-            <li>• College explorer (courses & fees)</li>
-            <li>• Mentor connect flow & booking</li>
-            <li>• 100% focused job & internship guidance (mentorship-based)</li>
-            <li>• AI mock interviews & unlimited AI career chats</li>
-          </ul>
+      <section class="space-y-4">
+        <h1 class="text-3xl font-bold">
+          👋 Welcome back to your Career Space
+        </h1>
+
+        <p class="text-lg text-slate-300 max-w-3xl">
+          Explore skills, colleges, jobs, and guided preparation tools — all built
+          to help you make confident career decisions step by step.
+        </p>
+
+        <div class="mt-4">
+          {cta_html}
         </div>
       </section>
+
 
 
       <section>
@@ -595,6 +594,62 @@ def home_logged_in():
             </p>
           </div>
         </section>
+
+        <section class="mt-16">
+  <h2 class="text-2xl font-bold text-center mb-8">
+    Subscription plans designed for every stage
+  </h2>
+
+  <div class="grid md:grid-cols-4 gap-6">
+
+    <!-- FREE -->
+    <div class="support-box text-center">
+      <h3 class="font-semibold">Free</h3>
+      <p class="text-2xl font-bold my-2">₹0</p>
+      <ul class="text-sm text-slate-300 space-y-1">
+        <li>✔ 1 AI career chat</li>
+        <li>✔ Browse colleges & jobs</li>
+        <li>✔ Basic exploration access</li>
+      </ul>
+    </div>
+
+    <!-- ₹299 -->
+    <div class="support-box text-center">
+      <h3 class="font-semibold">Starter</h3>
+      <p class="text-2xl font-bold my-2">₹299</p>
+      <ul class="text-sm text-slate-300 space-y-1">
+        <li>✔ Skill videos access</li>
+        <li>✔ Previous year papers</li>
+        <li>✔ Limited mentor insights</li>
+      </ul>
+    </div>
+
+    <!-- ₹499 (highlighted) -->
+    <div class="support-box text-center border border-indigo-500">
+      <h3 class="font-semibold">Student Pass</h3>
+      <p class="text-2xl font-bold my-2">₹499</p>
+      <ul class="text-sm text-slate-300 space-y-1">
+        <li>✔ Unlimited AI guidance</li>
+        <li>✔ Mock interviews</li>
+        <li>✔ Mentor connect</li>
+        <li>✔ Full platform access</li>
+      </ul>
+    </div>
+
+    <!-- ₹999 -->
+    <div class="support-box text-center">
+      <h3 class="font-semibold">Pro</h3>
+      <p class="text-2xl font-bold my-2">₹999</p>
+      <ul class="text-sm text-slate-300 space-y-1">
+        <li>✔ Priority mentorship</li>
+        <li>✔ Career roadmap reviews</li>
+        <li>✔ Future premium features</li>
+      </ul>
+    </div>
+
+  </div>
+</section>
+
     </div>
     """
     return render_page(content, "CareerInnTech | Home")
