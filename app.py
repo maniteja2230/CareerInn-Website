@@ -338,16 +338,23 @@ BASE_HTML = """
 </head>
 <body class="bg-[#030617] text-white">
 
-<nav class="flex justify-between items-center px-6 py-4 bg-black/30 backdrop-blur-md border-b border-slate-800">
+<nav class="flex justify-between items-center px-6 py-4 ...">
   <div class="flex items-center gap-3">
-    <div class="w-12 h-12 rounded-2xl bg-slate-900 flex items-center justify-center overflow-hidden">
-      <img src="/static/logo.png" class="w-10 h-10 object-contain" alt="logo">
+
+    <!-- LOGO GOES HERE -->
+    <div class="w-12 h-12 rounded-2xl bg-slate-900 overflow-hidden flex items-center justify-center">
+      <img src="/static/logo.png"
+           class="w-[140%] h-[140%] object-contain"
+           alt="CareerInnTech">
     </div>
+
     <div>
       <div class="logo-txt">CareerInnTech</div>
       <div class="text-xs text-slate-400">BTech • Hospitality • Careers</div>
     </div>
+
   </div>
+
 
   <div class="flex items-center">
     <a href="/" class="text-sm">Home</a>
@@ -1136,7 +1143,19 @@ def onboarding():
 
     if request.method == "POST":
         profile.onboarded = True
-        profile.notes = request.form.get("notes", "").strip()
+        profile.notes = f"""
+        Education: {request.form.get('education')}
+        Branch: {request.form.get('branch')}
+        Year: {request.form.get('year')}
+        College: {request.form.get('college')}
+        Goal: {request.form.get('goal')}
+        Skills: {request.form.get('skills')}
+        Location: {request.form.get('location')}
+        Phone: {request.form.get('phone')}
+        """.strip()
+        
+        profile.onboarded = True
+
         db.commit()
         db.close()
         return redirect("/home")
@@ -1156,20 +1175,78 @@ def onboarding():
       </div>
 
       <!-- Student registration form -->
-      <form method="POST" class="bg-slate-900 p-6 rounded-2xl space-y-4">
-        <h2 class="text-xl font-semibold">Student Registration</h2>
+      <form method="POST" class="bg-slate-900 p-8 rounded-2xl space-y-5">
 
-        <select name="track" class="input-box">
-          <option value="">Select Track</option>
-          <option value="btech">BTech</option>
-          <option value="hospitality">Hospitality</option>
-        </select>
+          <h2 class="text-2xl font-semibold">Student Registration</h2>
+          <p class="text-sm text-slate-400">
+            Help us personalize your CareerInnTech experience
+          </p>
+        
+          <!-- Track -->
+          <select name="track" class="input-box" required>
+            <option value="">Select Track</option>
+            <option value="btech">BTech</option>
+            <option value="hospitality">Hospitality</option>
+          </select>
+        
+          <!-- Education -->
+          <input name="education"
+                 class="input-box"
+                 placeholder="Current Education (eg: BTech, Diploma, Intermediate)"
+                 required>
+        
+          <!-- Branch -->
+          <input name="branch"
+                 class="input-box"
+                 placeholder="Branch / Specialization (eg: CSE, ECE, Hotel Management)"
+                 required>
+        
+          <!-- Year -->
+          <select name="year" class="input-box" required>
+            <option value="">Year of Study</option>
+            <option>1st Year</option>
+            <option>2nd Year</option>
+            <option>3rd Year</option>
+            <option>4th Year</option>
+            <option>Passed Out</option>
+          </select>
+        
+          <!-- College -->
+          <input name="college"
+                 class="input-box"
+                 placeholder="College Name"
+                 required>
+        
+          <!-- Career Goal -->
+          <input name="goal"
+                 class="input-box"
+                 placeholder="Career Goal (eg: Software Engineer, Hotel Manager)"
+                 required>
+        
+          <!-- Skills -->
+          <textarea name="skills"
+                    rows="3"
+                    class="input-box"
+                    placeholder="Your current skills (comma separated)">
+          </textarea>
+        
+          <!-- Location -->
+          <input name="location"
+                 class="input-box"
+                 placeholder="Preferred Job Location (eg: Hyderabad, Bangalore)">
+        
+          <!-- Phone -->
+          <input name="phone"
+                 class="input-box"
+                 placeholder="Phone Number (optional)">
+        
+          <button class="submit-btn w-full">
+            Complete Registration
+          </button>
+        
+        </form>
 
-        <input name="notes" class="input-box"
-          placeholder="Current study, college, goals (eg: BTech CSE 2nd year, aiming for software roles)">
-
-        <button class="submit-btn">Continue to Dashboard</button>
-      </form>
+  
     </div>
     """
 
@@ -1202,11 +1279,15 @@ def login():
                 profile = UserProfile(user_id=user.id)
                 db.add(profile)
                 db.commit()
-
+            
+            # 🔒 SAVE VALUE BEFORE CLOSING SESSION
+            is_onboarded = profile.onboarded
+            
             db.close()
-
-            if not profile.onboarded:
+            
+            if not is_onboarded:
                 return redirect("/onboarding")
+
 
             return redirect("/home")
 
