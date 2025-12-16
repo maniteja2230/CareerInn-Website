@@ -1782,6 +1782,15 @@ def profile():
     projects_count = db.query(Project).filter_by(
         user_id=session["user_id"]
     ).count()
+    if profile is None:
+        profile = UserProfile(
+            user_id=user_id,
+            skills_text="",
+            target_roles="",
+            notes=""
+        )
+        db.add(profile)
+        db.commit()
 
     db.close()
     content = f"""
