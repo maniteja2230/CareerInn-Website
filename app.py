@@ -650,7 +650,22 @@ def btech_course_detail(slug):
     return render_page(html, course["title"])
 
 # -------------------- HOME --------------------
+@app.route("/landing")
+def landing():
+    content = """
+    <div class="text-center pt-20">
+      <h1 class="text-5xl font-bold">CareerInnTech</h1>
+      <p class="text-slate-400 mt-4">BTech • Hospitality • Careers</p>
 
+      <div class="mt-8 flex justify-center gap-4">
+        <a href="/login" class="primary-cta">Login</a>
+        <a href="/signup" class="px-6 py-3 rounded-xl bg-emerald-600 font-semibold">
+          Create Account
+        </a>
+      </div>
+    </div>
+    """
+    return render_page(content, "CareerInnTech")
 
 @app.route("/")
 def home():
