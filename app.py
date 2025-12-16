@@ -119,7 +119,17 @@ class UserProfile(Base):
     self_rating = Column(Integer, nullable=False, default=0)
     resume_link = Column(String(500), nullable=True)
     notes = Column(Text, nullable=True)
+
     onboarded = Column(Boolean, default=False)
+class SkillProgress(Base):
+    __tablename__ = "skill_progress"
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, nullable=False)
+    skill_id = Column(Integer, nullable=False)
+
+    assignments = Column(Text, nullable=True)
+    notes = Column(Text, nullable=True)
+
 
 
 class Subscription(Base):
@@ -152,6 +162,20 @@ class Skill(Base):
     category = Column(String(100), nullable=False)  # branch or area
     name = Column(String(200), nullable=False)
     video_link = Column(String(500), nullable=True)
+
+class Project(Base):
+    __tablename__ = "projects"
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, nullable=True)
+
+    title = Column(String(300), nullable=False)
+    description = Column(Text, nullable=True)
+    tech_stack = Column(String(300), nullable=True)
+
+    track = Column(String(50), nullable=False)  # btech / hospitality
+    is_sample = Column(Boolean, default=False)
+
 
 
 # -------------------- DB INIT & SEED --------------------
@@ -289,6 +313,66 @@ def init_db():
     if db.query(PrevPaper).count() == 0:
         db.add(PrevPaper(title="NCHM JEE - Past Papers (Aglasem)", year="all", link="https://admission.aglasem.com/nchmct-jee-question-paper/", uploader_id=None, is_upload=False))
         db.add(PrevPaper(title="IIIT Hyderabad Sample Papers", year="recent", link="https://www.iiit.ac.in/admissions/sample-papers", uploader_id=None, is_upload=False))
+    # -------------------- SAMPLE PROJECTS --------------------
+    if db.query(Project).count() == 0:
+    
+        # BTECH PROJECTS
+        btech_projects = [
+            (
+                "EAMCET College Predictor",
+                "Predicts colleges based on EAMCET rank and category.",
+                "Python, SQL, Data Analysis",
+            ),
+            (
+                "Student Attendance Management System",
+                "Web app to manage student attendance digitally.",
+                "Flask, SQLite, HTML, CSS",
+            ),
+            (
+                "AI Resume Analyzer",
+                "Analyzes resumes and suggests improvements using AI.",
+                "Python, NLP, AI",
+            ),
+        ]
+    
+        for title, desc, tech in btech_projects:
+            db.add(Project(
+                user_id=None,
+                title=title,
+                description=desc,
+                tech_stack=tech,
+                track="btech",
+                is_sample=True
+            ))
+    
+        # HOSPITALITY PROJECTS
+        hospitality_projects = [
+            (
+                "Hotel Room Booking System",
+                "Manages room availability and guest reservations.",
+                "Python, Flask, MySQL",
+            ),
+            (
+                "Restaurant Order Management System",
+                "Tracks food orders, billing and kitchen workflow.",
+                "Flask, HTML, CSS",
+            ),
+            (
+                "Guest Feedback Analysis",
+                "Analyzes guest feedback to improve hotel services.",
+                "Python, Data Analysis",
+            ),
+        ]
+    
+        for title, desc, tech in hospitality_projects:
+            db.add(Project(
+                user_id=None,
+                title=title,
+                description=desc,
+                tech_stack=tech,
+                track="hospitality",
+                is_sample=True
+            ))
 
     db.commit()
     db.close()
@@ -521,22 +605,66 @@ def home_logged_in():
 
     user_id = session.get("user_id")
     logged_in = True
+    db = get_db()
+    profile = db.query(UserProfile).filter_by(user_id=user_id).first()
+    db.close()
+    
+    show_complete_registration = profile and not profile.onboarded
+
 
 
 
 
     # CTA text: one free AI chat then subscribe 499
     cta_html = ""
+
     if logged_in:
         db = get_db()
         usage = db.query(AiUsage).filter_by(user_id=user_id).first()
         db.close()
+    
         if usage and usage.ai_used >= 1:
-            cta_html = '<a href="/subscribe" class="primary-cta">Get Started – ₹499 / year</a><p class="text-sm text-slate-400 mt-2">Your free AI chat expired. Subscribe for unlimited access.</p>'
+            cta_html = """
+            <a href="/subscribe" class="primary-cta">
+              Get Started – ₹499 / year
+            </a>
+            <p class="text-sm text-slate-400 mt-2">
+              Your free AI chat expired. Subscribe for unlimited access.
+            </p>
+            """
         else:
-            cta_html = '<a href="/chatbot" class="primary-cta">Start your free AI chat</a><p class="text-sm text-slate-400 mt-2">Every user gets one free full AI chat. Subscribe afterwards for unlimited access.</p>'
+            cta_html = """
+            <a href="/chatbot" class="primary-cta">
+              Start your free AI chat
+            </a>
+            <p class="text-sm text-slate-400 mt-2">
+              Every user gets one free full AI chat. Subscribe afterwards for unlimited access.
+            </p>
+            """
+    
+        # 🔴 ADD REGISTRATION WARNING (THIS IS NEW)
+        if show_complete_registration:
+            cta_html += """
+            <div class="mt-6">
+              <a href="/onboarding"
+                 class="px-6 py-3 rounded-xl bg-rose-600 font-semibold block text-center">
+                ⚠ Complete Registration
+              </a>
+              <p class="text-xs text-slate-400 text-center mt-2">
+                Please complete your profile to unlock all features
+              </p>
+            </div>
+            """
     else:
-        cta_html = '<a href="/signup" class="primary-cta">Create free account</a><p class="text-sm text-slate-400 mt-2">Signup to get one free AI chat.</p>'
+        cta_html = """
+        <a href="/signup" class="primary-cta">
+          Create free account
+        </a>
+        <p class="text-sm text-slate-400 mt-2">
+          Signup to get one free AI chat.
+        </p>
+        """
+
 
     content = f"""
     <div class="max-w-6xl mx-auto space-y-8">
@@ -782,6 +910,17 @@ def skills():
         .distinct()
         .all()
     )
+    user_id = session.get("user_id")
+
+    progress_map = {}
+    if user_id:
+        progress = (
+            db.query(SkillProgress)
+            .filter_by(user_id=user_id)
+            .all()
+        )
+        progress_map = {p.skill_id: p for p in progress}
+
     db.close()
 
     categories = [c[0] for c in categories]
@@ -810,6 +949,38 @@ def skills():
               </video>
             </div>
             """
+            user_progress = progress_map.get(sk.id)
+
+            assignment_val = user_progress.assignments if user_progress else ""
+            notes_val = user_progress.notes if user_progress else ""
+            
+            skills_html += f"""
+            <div class="mt-3 mb-6 bg-slate-800 p-4 rounded-xl">
+              <form method="POST" action="/save-skill-progress">
+            
+                <input type="hidden" name="skill_id" value="{sk.id}">
+                <input type="hidden" name="track" value="{track}">
+                <input type="hidden" name="category" value="{category}">
+            
+                <label class="text-xs text-slate-300">Assignments</label>
+                <textarea
+                  name="assignments"
+                  rows="2"
+                  class="input-box mb-2"
+                  placeholder="Tasks, practice, homework...">{assignment_val}</textarea>
+            
+                <label class="text-xs text-slate-300">Notes</label>
+                <textarea
+                  name="notes"
+                  rows="2"
+                  class="input-box mb-3"
+                  placeholder="What you learned, mistakes, tips...">{notes_val}</textarea>
+            
+                <button class="submit-btn w-full">Save</button>
+              </form>
+            </div>
+            """
+
         skills_html += "</div>"
 
     if not skills_html:
@@ -844,6 +1015,106 @@ def skills():
     """
 
     return render_page(content, "Skills")
+
+
+
+@app.route("/save-skill-progress", methods=["POST"])
+def save_skill_progress():
+    if "user_id" not in session:
+        return redirect("/login")
+
+    user_id = session["user_id"]
+    skill_id = int(request.form.get("skill_id"))
+    assignments = request.form.get("assignments", "").strip()
+    notes = request.form.get("notes", "").strip()
+
+    track = request.form.get("track", "")
+    category = request.form.get("category", "")
+
+    db = get_db()
+
+    progress = db.query(SkillProgress).filter_by(
+        user_id=user_id,
+        skill_id=skill_id
+    ).first()
+
+    if not progress:
+        progress = SkillProgress(
+            user_id=user_id,
+            skill_id=skill_id
+        )
+        db.add(progress)
+
+    progress.assignments = assignments
+    progress.notes = notes
+
+    db.commit()
+    db.close()
+
+    return redirect(f"/skills?track={track}&category={category}")
+
+
+@app.route("/projects")
+def projects():
+    if "user_id" not in session:
+        return redirect("/login")
+
+    track = request.args.get("track", "btech")  # default btech
+    user_id = session["user_id"]
+
+    db = get_db()
+
+    projects = db.query(Project).filter(
+        Project.track == track,
+        (Project.is_sample == True) | (Project.user_id == user_id)
+    ).all()
+
+    db.close()
+
+    cards = ""
+    for p in projects:
+        tag = "<span class='text-xs text-emerald-400'>(Sample)</span>" if p.is_sample else ""
+        cards += f"""
+        <div class="support-box">
+          <h3 class="font-semibold">
+            {p.title} {tag}
+          </h3>
+          <p class="text-sm text-slate-300 mt-1">{p.description or ""}</p>
+          <p class="text-xs text-indigo-300 mt-1">
+            Tech: {p.tech_stack or "-"}
+          </p>
+        </div>
+        """
+
+    content = f"""
+    <div class="max-w-6xl mx-auto space-y-6">
+
+      <h1 class="text-2xl font-bold">Projects</h1>
+
+      <!-- FILTER -->
+      <div class="flex gap-4">
+        <a href="/projects?track=btech"
+           class="px-6 py-3 rounded-xl bg-indigo-600 font-semibold">
+           🎓 BTech Projects
+        </a>
+
+        <a href="/projects?track=hospitality"
+           class="px-6 py-3 rounded-xl bg-emerald-600 font-semibold">
+           🏨 Hospitality Projects
+        </a>
+      </div>
+
+      <!-- PROJECT LIST -->
+      <div class="grid md:grid-cols-2 gap-4">
+        {cards if cards else "<p class='text-slate-400'>No projects yet.</p>"}
+      </div>
+
+    </div>
+    """
+
+    return render_page(content, "Projects")
+
+
 
 
    
@@ -1229,7 +1500,7 @@ def onboarding():
         </video>
       </div>
 
-      <!-- Student registration form -->
+      <!-- Student Registration Form -->
       <form method="POST" class="bg-slate-900 p-8 rounded-2xl space-y-5">
 
           <h2 class="text-2xl font-semibold">Student Registration</h2>
@@ -1278,12 +1549,7 @@ def onboarding():
                  placeholder="Career Goal (eg: Software Engineer, Hotel Manager)"
                  required>
         
-          <!-- Skills -->
-          <textarea name="skills"
-                    rows="3"
-                    class="input-box"
-                    placeholder="Your current skills (comma separated)">
-          </textarea>
+          
         
           <!-- Location -->
           <input name="location"
@@ -1291,9 +1557,9 @@ def onboarding():
                  placeholder="Preferred Job Location (eg: Hyderabad, Bangalore)">
         
           <!-- Phone -->
-          <input name="phone"
+          <input name="Phone"
                  class="input-box"
-                 placeholder="Phone Number (optional)">
+                 placeholder="Phone Number ">
         
           <button class="submit-btn w-full">
             Complete Registration
@@ -1507,29 +1773,69 @@ def profile():
     if "user_id" not in session:
         return redirect("/login")
     user_name = session["user"]
+    db = get_db()
+
+    profile = db.query(UserProfile).filter_by(
+        user_id=session["user_id"]
+    ).first()
+
+    projects_count = db.query(Project).filter_by(
+        user_id=session["user_id"]
+    ).count()
+
+    db.close()
     content = f"""
-    <div class="max-w-4xl mx-auto">
-      <h1 class="text-2xl font-bold mb-3">Profile — {user_name}</h1>
-      <div class="grid md:grid-cols-2 gap-4">
-        <div>
-          <h3 class="font-semibold mb-2">CareerInn guidance</h3>
-          <ul class="text-sm text-slate-300">
-            <li>• Focus on core skills, internships and projects</li>
-            <li>• Use AI to prepare for interviews</li>
-            <li>• Connect with mentors after subscribing</li>
-          </ul>
-        </div>
-        <div>
-          <h3 class="font-semibold mb-2">How to use this website (video)</h3>
-          <p class="text-xs text-slate-400 mb-2">Place tutorial video at /static/usage.mp4</p>
-          <video controls style="width:100%;border-radius:10px;background:#000;">
-            <source src="/static/usage.mp4" type="video/mp4">
-            Your browser does not support the video tag.
-          </video>
-        </div>
+    <div class="max-w-4xl mx-auto space-y-6">
+    
+      <h1 class="text-2xl font-bold">My Profile</h1>
+    
+      <!-- BASIC INFO -->
+      <div class="support-box">
+        <h3 class="font-semibold mb-2">Basic Information</h3>
+        <p><b>Name:</b> {session.get("user")}</p>
+        <p><b>Email:</b> {session.get("user_email", "—")}</p>
       </div>
+    
+      <!-- CAREER DETAILS -->
+      <div class="support-box">
+        <h3 class="font-semibold mb-2">Career Details</h3>
+        <p><b>Track:</b> {profile.notes if profile and profile.notes else "Not specified"}</p>
+        <p><b>Target Roles:</b> {profile.target_roles or "—"}</p>
+      </div>
+    
+      <!-- SKILLS -->
+      <div class="support-box">
+        <h3 class="font-semibold mb-2">Skills</h3>
+        <p class="text-sm text-slate-300">
+          {profile.skills_text or "No skills added yet."}
+        </p>
+      </div>
+    
+      <!-- ASSIGNMENTS & NOTES -->
+      <div class="support-box">
+        <h3 class="font-semibold mb-2">Assignments & Notes</h3>
+        <p class="text-sm">
+          <b>Assignments:</b><br>
+          {profile.assignments or "—"}
+        </p>
+        <p class="text-sm mt-2">
+          <b>Notes:</b><br>
+          {profile.skill_notes or "—"}
+        </p>
+      </div>
+    
+      <!-- PROJECTS -->
+      <div class="support-box">
+        <h3 class="font-semibold mb-2">Projects</h3>
+        <p>Total Projects Added: <b>{projects_count}</b></p>
+        <a href="/projects" class="text-indigo-400 underline text-sm">
+          View Projects →
+        </a>
+      </div>
+    
     </div>
     """
+
     return render_page(content, "Profile")
 
 # -------------------- UPLOADS SERVE --------------------
