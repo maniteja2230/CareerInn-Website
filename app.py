@@ -7,6 +7,7 @@
 import os
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
+from data.btech_courses import IMPORTANT_BTECH_COURSES
 
 from flask import (
     Flask,
@@ -710,7 +711,7 @@ def home_logged_in():
             </p>
         
             <div class="flex flex-wrap gap-4">
-              <a href="/skills?track=btech"
+              <a href="/skills/btech"
                  class="px-6 py-3 rounded-xl bg-indigo-600 font-semibold">
                 🎓 BTech Skills
               </a>
@@ -879,147 +880,6 @@ def courses():
     return render_page(content, "Courses")
 
 # -------------------- SKILLS (SEPARATE + FILTERED) --------------------
-@app.route("/skills")
-def skills():
-    track = request.args.get("track", "").strip()
-    category = request.args.get("category", "").strip()
-
-    # Step 1: Ask track first
-    if not track:
-        content = """
-        <div class="max-w-2xl mx-auto">
-          <h2 class="text-2xl font-bold">Choose Track for Skills</h2>
-          <p class="text-sm text-slate-300">Select your track to view relevant skills.</p>
-          <div class="mt-4 flex gap-3">
-            <a href="/skills?track=btech" class="primary-cta">BTech Skills</a>
-            <a href="/skills?track=hospitality" class="primary-cta">Hospitality Skills</a>
-          </div>
-        </div>
-        """
-        return render_page(content, "Skills")
-
-    # Step 2: Fetch skills with filters
-    db = get_db()
-    query = db.query(Skill).filter_by(track=track)
-
-    if category:
-        query = query.filter(Skill.category == category)
-
-    skills_data = query.all()
-
-    # fetch distinct categories for filter dropdown
-    categories = (
-        db.query(Skill.category)
-        .filter_by(track=track)
-        .distinct()
-        .all()
-    )
-    user_id = session.get("user_id")
-
-    progress_map = {}
-    if user_id:
-        progress = (
-            db.query(SkillProgress)
-            .filter_by(user_id=user_id)
-            .all()
-        )
-        progress_map = {p.skill_id: p for p in progress}
-
-    db.close()
-
-    categories = [c[0] for c in categories]
-
-    # Step 3: Group skills by category
-    from collections import defaultdict
-    skill_map = defaultdict(list)
-
-    for s in skills_data:
-        skill_map[s.category].append(s)
-
-    # Step 4: Build skills UI
-    skills_html = ""
-    for cat, items in skill_map.items():
-        skills_html += f"""
-        <div class="support-box mb-6">
-          <h3 class="font-semibold text-lg mb-3">{cat}</h3>
-        """
-        for sk in items:
-            skills_html += f"""
-            <div class="mb-4">
-              <p class="text-sm font-medium">{sk.name}</p>
-              <video controls class="w-full mt-2 rounded-xl bg-black">
-                <source src="{sk.video_link}" type="video/mp4">
-                Your browser does not support the video tag.
-              </video>
-            </div>
-            """
-            user_progress = progress_map.get(sk.id)
-
-            assignment_val = user_progress.assignments if user_progress else ""
-            notes_val = user_progress.notes if user_progress else ""
-            
-            skills_html += f"""
-            <div class="mt-3 mb-6 bg-slate-800 p-4 rounded-xl">
-              <form method="POST" action="/save-skill-progress">
-            
-                <input type="hidden" name="skill_id" value="{sk.id}">
-                <input type="hidden" name="track" value="{track}">
-                <input type="hidden" name="category" value="{category}">
-            
-                <label class="text-xs text-slate-300">Assignments</label>
-                <textarea
-                  name="assignments"
-                  rows="2"
-                  class="input-box mb-2"
-                  placeholder="Tasks, practice, homework...">{assignment_val}</textarea>
-            
-                <label class="text-xs text-slate-300">Notes</label>
-                <textarea
-                  name="notes"
-                  rows="2"
-                  class="input-box mb-3"
-                  placeholder="What you learned, mistakes, tips...">{notes_val}</textarea>
-            
-                <button class="submit-btn w-full">Save</button>
-              </form>
-            </div>
-            """
-
-        skills_html += "</div>"
-
-    if not skills_html:
-        skills_html = "<p class='text-slate-400'>No skills found for this filter.</p>"
-
-    # Step 5: Filters UI
-    options_html = "<option value=''>All Categories</option>"
-    for c in categories:
-        selected = "selected" if c == category else ""
-        options_html += f"<option value='{c}' {selected}>{c}</option>"
-
-    content = f"""
-    <div class="max-w-6xl mx-auto">
-      <h2 class="text-2xl font-bold mb-4">
-        Skills — {'BTech' if track=='btech' else 'Hospitality'}
-      </h2>
-
-      <form method="GET" class="grid md:grid-cols-3 gap-3 mb-5">
-        <input type="hidden" name="track" value="{track}">
-        <select name="category" class="input-box">
-          {options_html}
-        </select>
-        <button class="submit-btn">Apply Filter</button>
-      </form>
-
-      {skills_html}
-
-      <div class="mt-4">
-        <a href="/" class="px-3 py-1 rounded bg-indigo-600">Back</a>
-      </div>
-    </div>
-    """
-
-    return render_page(content, "Skills")
-
 
 
 @app.route("/save-skill-progress", methods=["POST"])
@@ -1119,9 +979,219 @@ def projects():
     return render_page(content, "Projects")
 
 
+def render_btech_skills(search=""):
+    search = (search or "").lower().strip()
+
+    html = f"""
+    <div class="max-w-7xl mx-auto space-y-12">
+
+      <!-- Greeting -->
+      <section class="text-center mt-6">
+        <h1 class="text-4xl font-bold mb-4">
+          Hello 👋 What do you want to learn?
+        </h1>
+
+        <!-- Search bar -->
+        <form method="GET" action="/skills/btech" class="max-w-3xl mx-auto mt-8">
+          <div class="relative">
+            <input
+              type="text"
+              name="q"
+              value="{search}"
+              placeholder="Search skills, courses, subjects..."
+              class="w-full px-6 py-4 rounded-2xl bg-slate-900
+                     border border-slate-700 text-white
+                     placeholder-slate-400 focus:outline-none
+                     focus:ring-2 focus:ring-indigo-500"
+            />
+            <button
+              type="submit"
+              class="absolute right-3 top-1/2 -translate-y-1/2
+                     px-4 py-2 rounded-xl bg-indigo-600 text-white">
+              🔍
+            </button>
+          </div>
+        </form>
+      </section>
+    """
+
+    # Branch-wise sections (dynamic)
+    for branch, courses in IMPORTANT_BTECH_COURSES.items():
+
+        filtered = (
+            [c for c in courses if search in c["title"].lower()]
+            if search else courses
+        )
+
+        if not filtered:
+            continue
+
+        html += f"""
+        <section>
+          <div class="flex justify-between items-center mb-4">
+            <h2 class="text-2xl font-semibold">{branch}</h2>
+            <a href="/skills/btech/{branch.lower()}"
+               class="text-indigo-400 text-sm hover:underline">
+              View all →
+            </a>
+          </div>
+
+          <div class="grid md:grid-cols-4 gap-5">
+        """
+
+        for c in filtered[:4]:
+            slug = c["slug"]
+            html += f"""
+            <a href="/skills/btech/course/{slug}"
+               class="support-box hover:scale-[1.03] transition">
+              <div class="h-32 rounded-lg bg-slate-800
+            flex items-center justify-center mb-3">
+  <span class="text-slate-400 text-sm">
+    📘 Course Roadmap
+  </span>
+</div>
+
+              <p class="font-semibold text-center">{c['title']}</p>
+            </a>
+            """
+
+        html += "</div></section>"
+
+    html += "</div>"
+    return render_page(html, "BTech Skills")
+
+@app.route("/skills/btech")
+def btech_skills():
+    query = request.args.get("q", "")
+    return render_btech_skills(query)
 
 
-   
+@app.route("/skills/btech/<branch>")
+def btech_branch_view(branch):
+    branch = branch.upper()
+
+    if branch not in IMPORTANT_BTECH_COURSES:
+        return redirect("/skills/btech")
+
+    courses = IMPORTANT_BTECH_COURSES[branch]
+
+    html = f"""
+    <div class="max-w-7xl mx-auto space-y-8">
+
+      <div class="flex justify-between items-center">
+        <h1 class="text-3xl font-bold">{branch} Skills</h1>
+        <a href="/skills/btech" class="text-indigo-400">← Back</a>
+      </div>
+
+      <div class="grid md:grid-cols-4 gap-6">
+    """
+
+    for c in courses:
+        html += f"""
+        <a href="/skills/btech/course/{c['slug']}"
+           class="support-box hover:scale-[1.03] transition">
+          <div class="h-32 rounded-lg bg-slate-800
+            flex items-center justify-center mb-3">
+  <span class="text-slate-400 text-sm">
+    📘 Course Roadmap
+  </span>
+</div>
+
+          <p class="font-semibold text-center">{c['title']}</p>
+        </a>
+        """
+
+    html += "</div></div>"
+    return render_page(html, f"{branch} Skills")
+
+@app.route("/skills/btech/course/<slug>")
+def btech_course_detail(slug):
+    course = None
+
+    for branch_courses in IMPORTANT_BTECH_COURSES.values():
+        for c in branch_courses:
+            if c["slug"] == slug:
+                course = c
+                break
+
+    if not course:
+        return redirect("/skills/btech")
+
+    html = f"""
+    <div class="max-w-6xl mx-auto space-y-10">
+
+      <!-- Back -->
+      <a href="/skills/btech" class="text-indigo-400">← Back</a>
+
+      <!-- Title -->
+      <h1 class="text-3xl font-bold">{course['title']}</h1>
+
+      <!-- ROW 1: Status + Video -->
+      <section class="grid md:grid-cols-[1fr,3fr] gap-6">
+
+        <!-- Status -->
+        <div class="support-box flex flex-col justify-center items-center text-center">
+          <h3 class="font-semibold mb-3">Status</h3>
+          <span class="px-5 py-2 rounded-full bg-yellow-500 text-black font-semibold">
+            Not Started
+          </span>
+        </div>
+
+        <!-- Video -->
+<div class="support-box">
+  <h3 class="font-semibold mb-3">Video</h3>
+
+  <div class="w-full h-56 rounded-xl bg-slate-800 flex items-center justify-center">
+    <p class="text-slate-400 text-sm">
+      🎬 Roadmap video coming soon
+    </p>
+  </div>
+
+  <p class="text-xs text-slate-400 mt-2">
+    Roadmap video will be added soon
+  </p>
+</div>
+
+
+    </section>
+
+      <!-- ROW 2: Learning Actions -->
+<section class="grid md:grid-cols-3 gap-6">
+
+  <div class="support-box text-center">
+    <div class="text-3xl mb-2">📘</div>
+    <div class="font-semibold">Concept Notes</div>
+    <p class="text-xs text-slate-400 mt-1">
+      Read concept notes for this topic
+    </p>
+  </div>
+
+  <div class="support-box text-center">
+    <div class="text-3xl mb-2">📝</div>
+    <div class="font-semibold">Assignments</div>
+    <p class="text-xs text-slate-400 mt-1">
+      Solve practice & assignment questions
+    </p>
+  </div>
+
+  <div class="support-box text-center">
+    <div class="text-3xl mb-2">🎯</div>
+    <div class="font-semibold">Skill Assessment</div>
+    <p class="text-xs text-slate-400 mt-1">
+      Take skill assessment test
+    </p>
+  </div>
+
+</section>
+
+
+    </div>
+    """
+
+    return render_page(html, course["title"])
+
+
+
 
 # -------------------- COLLEGES --------------------
 @app.route("/colleges")
