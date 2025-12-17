@@ -694,6 +694,10 @@ def home_logged_in():
           <a href="/jobs" class="feature-card">💼 Jobs & Placements<p class="text-xs text-slate-400">Choose track to see jobs.</p></a>
           <a href="/prev-papers" class="feature-card">📚 Previous Papers<p class="text-xs text-slate-400">Curated view-only past papers.</p></a>
           <a href="/chatbot" class="feature-card">🤖 AI Career Bot<p class="text-xs text-slate-400">One free chat per user.</p></a>
+          <a href="/projects" class="feature-card">🧩 Projects<p class="text-xs text-slate-400">Sample & real projects by track</p></a>
+
+              
+
         </div>
       </section>
 
@@ -1772,80 +1776,67 @@ def dashboard():
 def profile():
     if "user_id" not in session:
         return redirect("/login")
+
+    user_id = session["user_id"]   # ✅ FIX 1
     user_name = session["user"]
+
     db = get_db()
-
-    profile = db.query(UserProfile).filter_by(
-        user_id=session["user_id"]
-    ).first()
-
-    projects_count = db.query(Project).filter_by(
-        user_id=session["user_id"]
-    ).count()
-    if profile is None:
-        profile = UserProfile(
-            user_id=user_id,
-            skills_text="",
-            target_roles="",
-            notes=""
-        )
-        db.add(profile)
-        db.commit()
-
+    profile = db.query(UserProfile).filter_by(user_id=user_id).first()
     db.close()
+
+    # ✅ SAFE FALLBACKS
+    notes = profile.notes if profile and profile.notes else "Not specified"
+    skills = profile.skills_text if profile and profile.skills_text else "No skills added yet"
+    targets = profile.target_roles if profile and profile.target_roles else "—"
+    resume = profile.resume_link if profile and profile.resume_link else "—"
+    rating = profile.self_rating if profile and profile.self_rating else "—"
+
     content = f"""
     <div class="max-w-4xl mx-auto space-y-6">
-    
+
       <h1 class="text-2xl font-bold">My Profile</h1>
-    
+
       <!-- BASIC INFO -->
       <div class="support-box">
         <h3 class="font-semibold mb-2">Basic Information</h3>
-        <p><b>Name:</b> {session.get("user")}</p>
-        <p><b>Email:</b> {session.get("user_email", "—")}</p>
+        <p><b>Name:</b> {user_name}</p>
       </div>
-    
-      <!-- CAREER DETAILS -->
+
+      <!-- REGISTRATION DETAILS -->
       <div class="support-box">
-        <h3 class="font-semibold mb-2">Career Details</h3>
-        <p><b>Track:</b> {profile.notes if profile and profile.notes else "Not specified"}</p>
-        <p><b>Target Roles:</b> {profile.target_roles or "—"}</p>
+        <h3 class="font-semibold mb-2">Registration Details</h3>
+        <p class="text-sm text-slate-300">{notes}</p>
       </div>
-    
+
       <!-- SKILLS -->
       <div class="support-box">
         <h3 class="font-semibold mb-2">Skills</h3>
-        <p class="text-sm text-slate-300">
-          {profile.skills_text or "No skills added yet."}
-        </p>
+        <p class="text-sm text-slate-300">{skills}</p>
       </div>
-    
-      <!-- ASSIGNMENTS & NOTES -->
+
+      <!-- TARGET ROLES -->
       <div class="support-box">
-        <h3 class="font-semibold mb-2">Assignments & Notes</h3>
-        <p class="text-sm">
-          <b>Assignments:</b><br>
-          {profile.assignments or "—"}
-        </p>
-        <p class="text-sm mt-2">
-          <b>Notes:</b><br>
-          {profile.skill_notes or "—"}
-        </p>
+        <h3 class="font-semibold mb-2">Target Roles</h3>
+        <p class="text-sm text-slate-300">{targets}</p>
       </div>
-    
-      <!-- PROJECTS -->
+
+      <!-- RESUME -->
       <div class="support-box">
-        <h3 class="font-semibold mb-2">Projects</h3>
-        <p>Total Projects Added: <b>{projects_count}</b></p>
-        <a href="/projects" class="text-indigo-400 underline text-sm">
-          View Projects →
-        </a>
+        <h3 class="font-semibold mb-2">Resume</h3>
+        <p class="text-sm text-slate-300">{resume}</p>
       </div>
-    
+
+      <!-- SELF RATING -->
+      <div class="support-box">
+        <h3 class="font-semibold mb-2">Self Rating</h3>
+        <p class="text-sm text-slate-300">{rating} / 5</p>
+      </div>
+
     </div>
     """
 
     return render_page(content, "Profile")
+
 
 # -------------------- UPLOADS SERVE --------------------
 @app.route("/uploads/<path:filename>")
